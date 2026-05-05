@@ -10,7 +10,8 @@ IB_PORT   = 7497           # 7497 = paper trading | 7496 = live
 CLIENT_ID = 1
 ACCOUNT   = ''             # Empty → use default account
 
-TOP20_TICKERS = [
+# Used as fallback when Wikipedia is unreachable, and for demo mode
+FALLBACK_TICKERS = [
     'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL',
     'META', 'LLY',  'TSLA', 'JPM',  'V',
     'UNH',  'XOM',  'JNJ',  'WMT',  'MA',

@@ -4,14 +4,19 @@ import numpy as np
 import pandas as pd
 
 from config import HISTORY_DAYS, OUTPUTS_DIR
-from analysis.correlations import compute_correlations, get_top_correlated_pairs
+from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.signals import generate_signals
 from reporting.charts import plot_correlation_matrix
 from reporting.report import print_report, save_signals_csv
 
 
 def run_demo():
-    """Run the bot in demo mode using synthetic prices — no IB connection needed."""
+    """Run the bot in demo mode using synthetic prices — no IB connection needed.
+
+    Uses 20 synthetic tickers with realistic correlation structure:
+    tech stocks are directly correlated with each other, while defensive
+    sectors (utilities, healthcare) are inversely correlated with tech.
+    """
     print("=" * 62)
     print("  SP500 CORRELATION BOT — MODO DEMO")
     print("  (Datos sintéticos · Sin conexión IB)")
@@ -27,24 +32,34 @@ def run_demo():
         'HD': 342.0,    'AVGO': 1312.0, 'COST': 728.0,  'NFLX': 615.0,
     }
 
-    # Tech stocks share a stronger market-factor loading → higher inter-correlation
-    tech = ['AAPL', 'MSFT', 'NVDA', 'META', 'GOOGL', 'AVGO', 'NFLX']
+    # Sector factor loadings:
+    #   tech → positive market-factor weight  (direct correlation with market)
+    #   defensive → negative weight           (inverse correlation with market)
+    tech      = ['AAPL', 'MSFT', 'NVDA', 'META', 'GOOGL', 'AVGO', 'NFLX', 'AMZN', 'TSLA']
+    defensive = ['JNJ', 'PG', 'WMT', 'COST', 'UNH']
+
     market_factor = np.random.normal(0, 0.008, n_days)
 
     prices = {}
     for ticker, base in base_prices.items():
-        idio   = np.random.normal(0, 0.015, n_days)
-        weight = 0.7 if ticker in tech else 0.4
+        idio = np.random.normal(0, 0.012, n_days)
+        if ticker in tech:
+            weight = 0.7
+        elif ticker in defensive:
+            weight = -0.3    # moves against the market factor → inverse corr with tech
+        else:
+            weight = 0.3     # financials / energy: mild positive
         prices[ticker] = base * np.cumprod(1 + market_factor * weight + idio)
 
     prices_df = pd.DataFrame(prices)
     prices_df.index = pd.date_range(end=datetime.date.today(), periods=n_days, freq='B')
 
     corr_matrix, returns = compute_correlations(prices_df)
-    top_pairs  = get_top_correlated_pairs(corr_matrix)
-    signals_df = generate_signals(prices_df, returns, corr_matrix)
+    top_pairs     = get_top_correlated_pairs(corr_matrix)
+    inverse_pairs = get_top_inverse_pairs(corr_matrix)
+    signals_df    = generate_signals(prices_df, returns, corr_matrix)
 
-    print_report(signals_df, top_pairs)
+    print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, OUTPUTS_DIR / 'demo_signals.csv')
     plot_correlation_matrix(corr_matrix, OUTPUTS_DIR / 'demo_correlation_matrix.png')
     print(f"\n✓ Demo completado. Revisa la carpeta outputs/")

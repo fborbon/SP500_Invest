@@ -11,20 +11,25 @@ def predict_price(target: str, returns: pd.DataFrame, corr_matrix: pd.DataFrame,
                   lookahead: int = None) -> tuple:
     """Predict future return of `target` using correlated tickers as features.
 
-    Returns (predicted_return, r2_score, top_predictors).
+    Both direct (positive r) and inverse (negative r) correlators are used as
+    predictors; LinearRegression assigns the correct sign to each coefficient.
+
+    Returns (predicted_return, r2_score, top_predictors, corr_signs).
+      corr_signs: dict mapping predictor ticker → raw Pearson r (float).
+                  Positive = moves with target, negative = moves against it.
     """
     if lookahead is None:
         lookahead = PREDICTION_DAYS
 
     predictors = [t for t in returns.columns if t != target]
     if target not in corr_matrix.columns:
-        return None, 0.0, []
+        return None, 0.0, [], {}
 
     corrs = corr_matrix[target][predictors].abs()
     top_pred = corrs[corrs >= MIN_CORRELATION].sort_values(ascending=False)
 
     if len(top_pred) < 2:
-        return None, 0.0, []
+        return None, 0.0, [], {}
 
     pred_cols = top_pred.index.tolist()
     X = returns[pred_cols].values
@@ -32,7 +37,7 @@ def predict_price(target: str, returns: pd.DataFrame, corr_matrix: pd.DataFrame,
 
     n_samples = len(X) - lookahead
     if n_samples < 20:
-        return None, 0.0, []
+        return None, 0.0, [], {}
 
     X_train = X[:n_samples]
     y_train = np.array([
@@ -58,4 +63,7 @@ def predict_price(target: str, returns: pd.DataFrame, corr_matrix: pd.DataFrame,
     model.fit(X_scaled, y_train)
     pred_return = float(model.predict(scaler.transform(X[-1:]))[0])
 
-    return pred_return, r2, pred_cols[:5]
+    top5 = pred_cols[:5]
+    corr_signs = {col: float(corr_matrix[target][col]) for col in top5}
+
+    return pred_return, r2, top5, corr_signs

@@ -9,14 +9,16 @@ def generate_signals(prices_df: pd.DataFrame, returns: pd.DataFrame,
                      corr_matrix: pd.DataFrame) -> pd.DataFrame:
     """Generate a BUY/SELL/HOLD signal for each ticker based on predicted return.
 
+    Predictors are split into direct (positive r) and inverse (negative r) groups.
     Returns a DataFrame sorted by predicted_return descending.
     """
     current_prices = prices_df.iloc[-1]
     signals = []
+    total = len(returns.columns)
 
-    print("\nGenerando señales de predicción...")
-    for ticker in returns.columns:
-        pred_ret, r2, top_preds = predict_price(ticker, returns, corr_matrix)
+    print(f"\nGenerando señales de predicción ({total} tickers)...")
+    for i, ticker in enumerate(returns.columns, 1):
+        pred_ret, r2, top_preds, corr_signs = predict_price(ticker, returns, corr_matrix)
 
         if pred_ret is None:
             signal = 'INSUF_DATA'
@@ -33,20 +35,25 @@ def generate_signals(prices_df: pd.DataFrame, returns: pd.DataFrame,
         target  = (current * (1 + pred_ret)
                    if pred_ret is not None and not np.isnan(current) else np.nan)
 
+        direct  = [t for t in top_preds if corr_signs.get(t, 1) > 0]
+        inverse = [t for t in top_preds if corr_signs.get(t, 1) < 0]
+
         signals.append({
-            'ticker':           ticker,
-            'current_price':    round(current, 2),
-            'target_price_7d':  round(target, 2) if not np.isnan(target) else None,
-            'predicted_return': round(pred_ret * 100, 2) if pred_ret is not None else None,
-            'model_r2':         round(r2, 3),
-            'top_predictors':   ', '.join(top_preds),
-            'signal':           signal,
+            'ticker':              ticker,
+            'current_price':       round(current, 2),
+            'target_price_7d':     round(target, 2) if not np.isnan(target) else None,
+            'predicted_return':    round(pred_ret * 100, 2) if pred_ret is not None else None,
+            'model_r2':            round(r2, 3),
+            'direct_predictors':   ', '.join(direct),
+            'inverse_predictors':  ', '.join(inverse),
+            'signal':              signal,
         })
 
         icon = {'BUY': '▲', 'SELL': '▼', 'HOLD': '─'}.get(signal, '?')
         ret_str = f"{pred_ret * 100:+.2f}%" if pred_ret is not None else 'N/A'
-        print(f"  {icon} {ticker:<6} ${current:.2f} → ${target:.2f}  "
-              f"ret={ret_str}  R²={r2:.2f}  [{signal}]")
+        inv_str = f"  ↕ inv:{','.join(inverse)}" if inverse else ''
+        print(f"  [{i:>3}/{total}] {icon} {ticker:<6} ${current:.2f} → ${target:.2f}  "
+              f"ret={ret_str}  R²={r2:.2f}  [{signal}]{inv_str}")
 
     df = pd.DataFrame(signals)
     df.sort_values('predicted_return', ascending=False, inplace=True, na_position='last')
