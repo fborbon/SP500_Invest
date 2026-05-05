@@ -1,0 +1,50 @@
+import datetime
+
+import numpy as np
+import pandas as pd
+
+from config import HISTORY_DAYS, OUTPUTS_DIR
+from analysis.correlations import compute_correlations, get_top_correlated_pairs
+from analysis.signals import generate_signals
+from reporting.charts import plot_correlation_matrix
+from reporting.report import print_report, save_signals_csv
+
+
+def run_demo():
+    """Run the bot in demo mode using synthetic prices — no IB connection needed."""
+    print("=" * 62)
+    print("  SP500 CORRELATION BOT — MODO DEMO")
+    print("  (Datos sintéticos · Sin conexión IB)")
+    print("=" * 62)
+
+    np.random.seed(42)
+    n_days = HISTORY_DAYS
+    base_prices = {
+        'AAPL': 189.0,  'MSFT': 412.0,  'NVDA': 876.0,  'AMZN': 185.0,
+        'GOOGL': 167.0, 'META': 502.0,  'LLY': 734.0,   'TSLA': 178.0,
+        'JPM': 198.0,   'V': 274.0,     'UNH': 521.0,   'XOM': 114.0,
+        'JNJ': 157.0,   'WMT': 64.0,    'MA': 461.0,    'PG': 162.0,
+        'HD': 342.0,    'AVGO': 1312.0, 'COST': 728.0,  'NFLX': 615.0,
+    }
+
+    # Tech stocks share a stronger market-factor loading → higher inter-correlation
+    tech = ['AAPL', 'MSFT', 'NVDA', 'META', 'GOOGL', 'AVGO', 'NFLX']
+    market_factor = np.random.normal(0, 0.008, n_days)
+
+    prices = {}
+    for ticker, base in base_prices.items():
+        idio   = np.random.normal(0, 0.015, n_days)
+        weight = 0.7 if ticker in tech else 0.4
+        prices[ticker] = base * np.cumprod(1 + market_factor * weight + idio)
+
+    prices_df = pd.DataFrame(prices)
+    prices_df.index = pd.date_range(end=datetime.date.today(), periods=n_days, freq='B')
+
+    corr_matrix, returns = compute_correlations(prices_df)
+    top_pairs  = get_top_correlated_pairs(corr_matrix)
+    signals_df = generate_signals(prices_df, returns, corr_matrix)
+
+    print_report(signals_df, top_pairs)
+    save_signals_csv(signals_df, OUTPUTS_DIR / 'demo_signals.csv')
+    plot_correlation_matrix(corr_matrix, OUTPUTS_DIR / 'demo_correlation_matrix.png')
+    print(f"\n✓ Demo completado. Revisa la carpeta outputs/")
