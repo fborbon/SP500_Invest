@@ -1,6 +1,11 @@
+from io import StringIO
+
 import pandas as pd
+import requests
 
 from config import FALLBACK_TICKERS
+
+_HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 
 
 def get_sp500_tickers() -> list:
@@ -11,7 +16,9 @@ def get_sp500_tickers() -> list:
     """
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        table = pd.read_html(url, attrs={'id': 'constituents'})[0]
+        resp = requests.get(url, headers=_HEADERS, timeout=15)
+        resp.raise_for_status()
+        table = pd.read_html(StringIO(resp.text), attrs={'id': 'constituents'})[0]
         tickers = table['Symbol'].tolist()
         print(f"  ✓ S&P 500: {len(tickers)} tickers obtenidos de Wikipedia")
         return tickers
