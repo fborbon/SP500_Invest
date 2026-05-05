@@ -1,3 +1,4 @@
+import math
 import time
 
 import pandas as pd
@@ -7,6 +8,18 @@ from config import HISTORY_DAYS
 from broker.connection import get_contract
 
 
+def _build_duration(trading_days: int) -> str:
+    """Convert a number of trading days to an IB durationStr.
+
+    IB requires years (Y) for requests longer than 365 days.
+    1 year ≈ 252 trading days.
+    """
+    total = trading_days + 10   # small buffer for holidays
+    if total > 365:
+        return f'{math.ceil(total / 252)} Y'
+    return f'{total} D'
+
+
 def fetch_prices(ib: IB, tickers: list, duration: str = None,
                  bar_size: str = '1 day') -> pd.DataFrame:
     """Download historical close prices for each ticker.
@@ -14,7 +27,7 @@ def fetch_prices(ib: IB, tickers: list, duration: str = None,
     Returns a DataFrame with dates as index and tickers as columns.
     """
     if duration is None:
-        duration = f'{HISTORY_DAYS + 10} D'   # extra margin for weekends
+        duration = _build_duration(HISTORY_DAYS)
 
     prices = {}
     print(f"\nDescargando histórico ({duration}, barras {bar_size})...")
