@@ -60,10 +60,10 @@ python main.py live
 |---|---|---|
 | `IB_HOST` | `127.0.0.1` | TWS / IB Gateway host |
 | `IB_PORT` | `7497` | 7497 = paper, 7496 = live |
-| `HISTORY_DAYS` | `90` | Days of price history |
+| `HISTORY_DAYS` | `800` | Trading days of price history (>365 auto-converts to years for IB) |
 | `PREDICTION_DAYS` | `7` | Forecast horizon |
 | `MIN_CORRELATION` | `0.50` | Minimum absolute Pearson r to use a predictor (direct or inverse) |
-| `MIN_R2` | `0.40` | Minimum R² to trust a signal |
+| `MIN_R2` | `0.25` | Minimum R² to trust a signal |
 | `BUY_THRESHOLD` | `0.02` | Predicted return > 2% → BUY |
 | `SELL_THRESHOLD` | `-0.02` | Predicted return < −2% → SELL |
 | `MAX_POSITION_PCT` | `0.05` | Max 5% of portfolio per position |
