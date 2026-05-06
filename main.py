@@ -9,7 +9,8 @@ from analysis.universe import get_sp500_tickers
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
-from reporting.charts import plot_correlation_matrix, plot_prediction_analysis
+from reporting.charts import (plot_correlation_matrix, plot_market_cap_bars,
+                               plot_prediction_analysis, plot_price_series)
 from reporting.report import print_report, save_signals_csv
 
 
@@ -19,21 +20,21 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
 
     Args:
         execute_trades: If True, places real orders in IB. Use with caution.
-        save_plots:     If True, saves heatmap + per-signal prediction analysis PNGs.
+        save_plots:     If True, saves heatmap + price series + per-signal analysis PNGs.
         n_tickers:      Number of top S&P 500 companies by market cap to use.
                         None = full universe (~503 tickers).
     """
     ib = connect_ib()
     try:
-        print("\nObteniendo universo S&P 500...")
+        print("\nFetching S&P 500 universe...")
         tickers = get_sp500_tickers(n=n_tickers)
 
         prices_df = fetch_prices(ib, tickers)
         if prices_df.empty or len(prices_df.columns) < 5:
-            print("✗ Datos insuficientes. Abortando.")
+            print("✗ Insufficient data. Aborting.")
             return
 
-        print("\nCalculando correlaciones...")
+        print("\nCalculating correlations...")
         corr_matrix, returns = compute_correlations(prices_df)
         top_pairs     = get_top_correlated_pairs(corr_matrix, top_n=10)
         inverse_pairs = get_top_inverse_pairs(corr_matrix, top_n=10)
@@ -45,12 +46,16 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         if save_plots:
             plot_correlation_matrix(corr_matrix)
 
-            # Generate dual-subplot analysis for top 5 signals by predicted return
-            # Hardcoded. Top 5 most valuable tickers 
-            top_signals = signals_df.head(5)
+            # All tickers in gray, top 15 most valuable in color
+            plot_price_series(prices_df, tickers, top_n=15)
 
+            # Top 15 vs bottom 15 companies by market cap
+            plot_market_cap_bars(prices_df, tickers, top_n=15)
+
+            # Dual-subplot analysis for top 5 signals by predicted return
+            top_signals = signals_df.head(5)  # Top 5 most valuable tickers
             if not top_signals.empty:
-                print("\nGenerando gráficos de análisis...")
+                print("\nGenerating analysis charts...")
             for _, row in top_signals.iterrows():
                 ticker = row['ticker']
                 pred_ret, r2, top5, corr_signs, y_actual, y_pred = predict_price(
@@ -65,7 +70,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
 
         if execute_trades:
             portfolio_value = get_portfolio_value(ib)
-            print(f"\nEjecutando órdenes (portfolio: ${portfolio_value:,.0f})...")
+            print(f"\nPlacing orders (portfolio: ${portfolio_value:,.0f})...")
             actionable = signals_df[signals_df['signal'].isin(['BUY', 'SELL'])]
             for _, row in actionable.iterrows():
                 if row['model_r2'] < MIN_R2:
@@ -74,12 +79,12 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                 qty = calculate_position_size(portfolio_value, row['current_price'], strength)
                 execute_order(ib, row['ticker'], row['signal'], qty)
         else:
-            print("\n  ℹ Modo simulación — órdenes no ejecutadas.")
-            print("    Para ejecutar en paper trading: run_bot(execute_trades=True)")
+            print("\n  ℹ Simulation mode — no orders placed.")
+            print("    To execute on paper trading: run_bot(execute_trades=True)")
 
     finally:
         ib.disconnect()
-        print("\n✓ Desconectado de Interactive Brokers.")
+        print("\n✓ Disconnected from Interactive Brokers.")
 
 
 if __name__ == '__main__':
@@ -87,11 +92,11 @@ if __name__ == '__main__':
     from demo import run_demo
     import config
 
-    mode     = sys.argv[1] if len(sys.argv) > 1 else 'demo'
-    _n_arg   = sys.argv[2] if len(sys.argv) > 2 else None
-    n        = (_n_arg if _n_arg == 'FALLBACK_TICKERS'
-                else int(_n_arg) if _n_arg is not None
-                else None)
+    mode   = sys.argv[1] if len(sys.argv) > 1 else 'demo'
+    _n_arg = sys.argv[2] if len(sys.argv) > 2 else None
+    n      = (_n_arg if _n_arg == 'FALLBACK_TICKERS'
+               else int(_n_arg) if _n_arg is not None
+               else None)
 
     if mode == 'demo':
         run_demo()
@@ -100,15 +105,15 @@ if __name__ == '__main__':
         run_bot(execute_trades=True, n_tickers=n)
 
     elif mode == 'live':
-        confirm = input("¿Confirmas ejecución en cuenta REAL? (escribe SI): ")
-        if confirm.strip() == 'SI':
+        confirm = input("Confirm execution on LIVE account? (type YES): ")
+        if confirm.strip() == 'YES':
             config.IB_PORT = 7496   # override before connect_ib() reads it
             run_bot(execute_trades=True, n_tickers=n)
         else:
-            print("Cancelado.")
+            print("Cancelled.")
 
     elif mode == 'signals':
         run_bot(execute_trades=False, n_tickers=n)
 
     else:
-        print("Uso: python main.py [demo|paper|live|signals] [n_tickers]")
+        print("Usage: python main.py [demo|paper|live|signals] [n_tickers]")

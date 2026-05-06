@@ -30,7 +30,7 @@ def fetch_prices(ib: IB, tickers: list, duration: str = None,
         duration = _build_duration(HISTORY_DAYS)
 
     prices = {}
-    print(f"\nDescargando histórico ({duration}, barras {bar_size})...")
+    print(f"\nDownloading historical data ({duration}, bar size {bar_size})...")
 
     for ticker in tickers:
         try:
@@ -45,16 +45,16 @@ def fetch_prices(ib: IB, tickers: list, duration: str = None,
                 keepUpToDate=False,
             )
             if not bars:
-                print(f"  ✗ {ticker}: sin datos")
+                print(f"  ✗ {ticker}: no data")
                 continue
             df = util.df(bars)[['date', 'close']].set_index('date')
             prices[ticker] = df['close']
-            print(f"  ✓ {ticker}: {len(df)} barras — último cierre ${df['close'].iloc[-1]:.2f}")
+            print(f"  ✓ {ticker}: {len(df)} bars — last close ${df['close'].iloc[-1]:.2f}")
             time.sleep(0.2)   # avoid API throttling
         except Exception as e:
             print(f"  ✗ {ticker}: {e}")
 
     prices_df = pd.DataFrame(prices).tail(HISTORY_DAYS)
     prices_df.dropna(axis=1, how='all', inplace=True)
-    print(f"\n  Total tickers con datos: {len(prices_df.columns)}/{len(tickers)}")
+    print(f"\n  Tickers with data: {len(prices_df.columns)}/{len(tickers)}")
     return prices_df

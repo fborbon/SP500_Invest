@@ -14,14 +14,14 @@ from config import IB_HOST, IB_PORT, CLIENT_ID
 def connect_ib() -> IB:
     """Connect to Interactive Brokers TWS or IB Gateway."""
     ib = IB()
-    print(f"Conectando a IB en {IB_HOST}:{IB_PORT}...")
+    print(f"Connecting to IB at {IB_HOST}:{IB_PORT}...")
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID)
-        print(f"✓ Conectado. Cuenta: {ib.managedAccounts()}")
+        print(f"✓ Connected. Account: {ib.managedAccounts()}")
         return ib
     except Exception as e:
-        print(f"✗ Error de conexión: {e}")
-        print("  Asegúrate de que TWS o IB Gateway esté abierto y configurado.")
+        print(f"✗ Connection error: {e}")
+        print("  Make sure TWS or IB Gateway is open and configured.")
         raise
 
 

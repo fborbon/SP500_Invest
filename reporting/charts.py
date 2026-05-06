@@ -12,7 +12,7 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
     fig, ax = plt.subplots(figsize=(14, 12))
     n = len(corr_matrix)
     im = ax.imshow(corr_matrix.values, cmap='RdYlGn', vmin=-1, vmax=1, aspect='auto')
-    plt.colorbar(im, ax=ax, label='Correlación de Pearson')
+    plt.colorbar(im, ax=ax, label='Pearson Correlation')
 
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
@@ -25,11 +25,104 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
             color = 'black' if 0.3 < abs(val) < 0.8 else 'white'
             ax.text(j, i, f'{val:.2f}', ha='center', va='center', fontsize=7, color=color)
 
-    ax.set_title('Matriz de Correlación — S&P 500', fontsize=14, pad=16)
+    ax.set_title('Correlation Matrix — S&P 500', fontsize=14, pad=16)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"  Matriz guardada en: {save_path}")
+    print(f"  Correlation matrix saved to: {save_path}")
+
+
+def plot_price_series(prices_df, tickers_ordered, top_n=15, save_path=None):
+    """Normalized price time series for all tickers in prices_df.
+
+    The top_n most valuable companies (by order in tickers_ordered, which is
+    sorted by market cap) are drawn in distinct colors with labels.
+    All remaining tickers are drawn as thin light-gray lines without labels.
+    """
+    if save_path is None:
+        save_path = OUTPUTS_DIR / 'price_series.png'
+
+    # Identify top N tickers that actually have price data
+    top_tickers = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
+    colors = plt.cm.tab20.colors
+
+    fig, ax = plt.subplots(figsize=(18, 8))
+
+    def normalize(series):
+        return series / series.iloc[0] * 100
+
+    # Background — all non-top tickers in gray
+    for ticker in prices_df.columns:
+        if ticker not in top_tickers:
+            ax.plot(prices_df.index, normalize(prices_df[ticker]),
+                    color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+
+    # Foreground — top N tickers in color with labels
+    for idx, ticker in enumerate(top_tickers):
+        ax.plot(prices_df.index, normalize(prices_df[ticker]),
+                color=colors[idx % 20], linewidth=1.6, alpha=0.9,
+                label=ticker, zorder=2)
+
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Normalized price (base = 100)')
+    ax.set_title(f'S&P 500 Price Series — Top {len(top_tickers)} by market cap highlighted')
+    ax.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+    ax.grid(True, alpha=0.2)
+    ax.tick_params(axis='x', rotation=30)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Price series saved to: {save_path}")
+
+
+def plot_market_cap_bars(prices_df, tickers_ordered, top_n=15, save_path=None):
+    """Bar chart of current stock price for the top N and bottom N companies.
+
+    Companies are ordered by market cap via tickers_ordered (slickcharts ranking).
+    Top N shown in green on the left, bottom N in coral on the right, separated
+    by a gap. X axis = ticker, Y axis = last closing price.
+    """
+    if save_path is None:
+        save_path = OUTPUTS_DIR / 'market_cap_bars.png'
+
+    available = [t for t in tickers_ordered if t in prices_df.columns]
+    top    = available[:top_n]
+    bottom = available[-top_n:] if len(available) >= top_n * 2 else available[top_n:]
+
+    top_prices    = [prices_df[t].iloc[-1] for t in top]
+    bottom_prices = [prices_df[t].iloc[-1] for t in bottom]
+
+    # Build x positions with a gap between the two groups
+    gap = 2
+    x_top    = list(range(len(top)))
+    x_bottom = [x + len(top) + gap for x in range(len(bottom))]
+
+    fig, ax = plt.subplots(figsize=(max(16, (len(top) + len(bottom)) * 0.8), 7))
+
+    bars_top    = ax.bar(x_top,    top_prices,    color='mediumseagreen', alpha=0.85,
+                         edgecolor='white', linewidth=0.5, label=f'Top {len(top)} (most valuable)')
+    bars_bottom = ax.bar(x_bottom, bottom_prices, color='tomato',         alpha=0.85,
+                         edgecolor='white', linewidth=0.5, label=f'Bottom {len(bottom)} (least valuable)')
+
+    # Value labels on top of each bar
+    for bar in bars_top + bars_bottom:
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + bar.get_height() * 0.01,
+                f'${bar.get_height():,.0f}', ha='center', va='bottom', fontsize=7, rotation=45)
+
+    ax.set_xticks(x_top + x_bottom)
+    ax.set_xticklabels(top + bottom, rotation=45, ha='right', fontsize=9)
+    ax.set_ylabel('Last Close Price ($)')
+    ax.set_title(f'Top {len(top)} vs Bottom {len(bottom)} S&P 500 Companies — Last Close Price')
+    ax.legend(fontsize=9)
+    ax.grid(axis='y', alpha=0.25)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Market cap bars saved to: {save_path}")
 
 
 def plot_prediction_analysis(target: str, returns, prices_df,
@@ -53,23 +146,23 @@ def plot_prediction_analysis(target: str, returns, prices_df,
     r2 = float(np.corrcoef(y_actual, y_predicted)[0, 1] ** 2)
 
     ax_sc.scatter(y_actual * 100, y_predicted * 100,
-                  alpha=0.35, s=18, color='steelblue', label='Observaciones')
+                  alpha=0.35, s=18, color='steelblue', label='Observations')
 
     lim = max(abs(y_actual).max(), abs(y_predicted).max()) * 100 * 1.15
     ax_sc.plot([-lim, lim], [-lim, lim], 'k--', linewidth=1, alpha=0.4,
-               label='Predicción perfecta')
+               label='Perfect prediction')
 
     m, b = np.polyfit(y_actual * 100, y_predicted * 100, 1)
     x_line = np.linspace(y_actual.min() * 100, y_actual.max() * 100, 100)
     ax_sc.plot(x_line, m * x_line + b, color='crimson', linewidth=1.8,
-               label=f'Tendencia  R²={r2:.3f}')
+               label=f'Trend  R²={r2:.3f}')
 
     ax_sc.axhline(0, color='grey', linewidth=0.5, alpha=0.6)
     ax_sc.axvline(0, color='grey', linewidth=0.5, alpha=0.6)
     ax_sc.set_aspect('equal', adjustable='box')
-    ax_sc.set_xlabel('Retorno real acumulado (%)')
-    ax_sc.set_ylabel('Retorno predicho (%)')
-    ax_sc.set_title('Real vs Predicho (in-sample)')
+    ax_sc.set_xlabel('Actual cumulative return (%)')
+    ax_sc.set_ylabel('Predicted return (%)')
+    ax_sc.set_title('Actual vs Predicted (in-sample)')
     ax_sc.legend(fontsize=8)
     ax_sc.grid(True, alpha=0.25)
 
@@ -83,7 +176,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
     if target in prices_df.columns:
         ax_ts.plot(prices_df.index, normalize(prices_df[target]),
                    color='black', linewidth=2.5, zorder=5,
-                   label=f'{target} (objetivo)')
+                   label=f'{target} (target)')
 
     for idx, ticker in enumerate(plot_tickers):
         r = corr_signs.get(ticker, 0)
@@ -94,9 +187,9 @@ def plot_prediction_analysis(target: str, returns, prices_df,
                    linewidth=1.4, alpha=0.85,
                    label=f'{direction} {ticker}  r={r:+.2f}')
 
-    ax_ts.set_xlabel('Fecha')
-    ax_ts.set_ylabel('Precio normalizado (base = 100)')
-    ax_ts.set_title('Serie de tiempo — objetivo y predictores')
+    ax_ts.set_xlabel('Date')
+    ax_ts.set_ylabel('Normalized price (base = 100)')
+    ax_ts.set_title('Price series — target and predictors')
     ax_ts.legend(fontsize=8, loc='upper left')
     ax_ts.grid(True, alpha=0.25)
     ax_ts.tick_params(axis='x', rotation=30)
@@ -104,4 +197,4 @@ def plot_prediction_analysis(target: str, returns, prices_df,
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"  Análisis guardado en: {save_path}")
+    print(f"  Analysis saved to: {save_path}")

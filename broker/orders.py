@@ -38,7 +38,7 @@ def execute_order(ib: IB, ticker: str, action: str, quantity: int,
 
     trade = ib.placeOrder(contract, order)
     ib.sleep(0.5)
-    print(f"  → Orden {action} {quantity}x {ticker}: {trade.orderStatus.status}")
+    print(f"  → Order {action} {quantity}x {ticker}: {trade.orderStatus.status}")
     return trade
 
 

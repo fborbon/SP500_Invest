@@ -18,8 +18,8 @@ def run_demo():
     sectors (utilities, healthcare) are inversely correlated with tech.
     """
     print("=" * 62)
-    print("  SP500 CORRELATION BOT — MODO DEMO")
-    print("  (Datos sintéticos · Sin conexión IB)")
+    print("  SP500 CORRELATION BOT — DEMO MODE")
+    print("  (Synthetic data · No IB connection needed)")
     print("=" * 62)
 
     np.random.seed(42)
@@ -62,4 +62,4 @@ def run_demo():
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, OUTPUTS_DIR / 'demo_signals.csv')
     plot_correlation_matrix(corr_matrix, OUTPUTS_DIR / 'demo_correlation_matrix.png')
-    print(f"\n✓ Demo completado. Revisa la carpeta outputs/")
+    print(f"\n✓ Demo complete. Check the outputs/ folder.")

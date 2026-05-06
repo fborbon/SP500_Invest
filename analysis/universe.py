@@ -13,17 +13,17 @@ def get_sp500_tickers(n=None) -> list:
 
     Args:
         n: Controls which tickers are returned:
-           - None              → all S&P 500 constituents (~503).
-           - int               → top N companies by market cap.
-           - 'FALLBACK_TICKERS'→ hardcoded top-20 list from config, no web request.
+           - None               → all S&P 500 constituents (~503).
+           - int                → top N companies by market cap.
+           - 'FALLBACK_TICKERS' → hardcoded top-20 list from config, no web request.
 
     Sources tried in order (unless n='FALLBACK_TICKERS'):
-      1. slickcharts.com  — already ranked by S&P 500 weight (≈ market cap).
+      1. slickcharts.com  — pre-ranked by S&P 500 weight (≈ market cap).
       2. Wikipedia        — fallback, alphabetical order (warns user).
       3. FALLBACK_TICKERS — hardcoded top-20 when both sources fail.
     """
     if n == 'FALLBACK_TICKERS':
-        print(f"  → Usando FALLBACK_TICKERS ({len(FALLBACK_TICKERS)} tickers hardcoded)")
+        print(f"  → Using FALLBACK_TICKERS ({len(FALLBACK_TICKERS)} hardcoded tickers)")
         return list(FALLBACK_TICKERS)
 
     tickers = _fetch_sorted_tickers()
@@ -31,9 +31,9 @@ def get_sp500_tickers(n=None) -> list:
     total = len(tickers)
     if n is not None:
         tickers = tickers[:n]
-        print(f"  → Seleccionados top {n} de {total} por capitalización de mercado")
+        print(f"  → Selected top {n} of {total} by market cap")
     else:
-        print(f"  → Usando los {total} tickers del S&P 500")
+        print(f"  → Using all {total} S&P 500 tickers")
 
     return tickers
 
@@ -45,10 +45,10 @@ def _fetch_sorted_tickers() -> list:
         resp.raise_for_status()
         table = pd.read_html(StringIO(resp.text))[0]
         tickers = table['Symbol'].str.strip().tolist()
-        print(f"  ✓ {len(tickers)} tickers obtenidos de slickcharts (orden por capitalización)")
+        print(f"  ✓ {len(tickers)} tickers fetched from slickcharts (sorted by market cap)")
         return tickers
     except Exception as e:
-        print(f"  ✗ slickcharts no disponible ({e}), intentando Wikipedia...")
+        print(f"  ✗ slickcharts unavailable ({e}), trying Wikipedia...")
 
     # ── 2. Wikipedia — alphabetical, not sorted by market cap ────────
     try:
@@ -57,9 +57,9 @@ def _fetch_sorted_tickers() -> list:
         resp.raise_for_status()
         table = pd.read_html(StringIO(resp.text), attrs={'id': 'constituents'})[0]
         tickers = table['Symbol'].tolist()
-        print(f"  ✓ {len(tickers)} tickers obtenidos de Wikipedia")
-        print("  ⚠ Wikipedia no ordena por capitalización — el parámetro n no garantiza las N mayores.")
+        print(f"  ✓ {len(tickers)} tickers fetched from Wikipedia")
+        print("  ⚠ Wikipedia is not sorted by market cap — n does not guarantee the top N largest.")
         return tickers
     except Exception as e:
-        print(f"  ✗ Wikipedia no disponible ({e}). Usando lista de respaldo.")
+        print(f"  ✗ Wikipedia unavailable ({e}). Using fallback list.")
         return list(FALLBACK_TICKERS)

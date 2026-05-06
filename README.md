@@ -60,13 +60,15 @@ V3/
 │
 ├── reporting/
 │   ├── __init__.py
-│   ├── charts.py           # plot_correlation_matrix();
-│   │                       # plot_prediction_analysis() — dual subplot per ticker
+│   ├── charts.py           # plot_correlation_matrix(); plot_price_series();
+│   │                       # plot_market_cap_bars(); plot_prediction_analysis()
 │   └── report.py           # print_report() — direct (↑↑) and inverse (↑↓) pair
 │                           # sections; save_signals_csv()
 │
 ├── outputs/                # Generated files (PNG, CSV) — git-ignored contents
 │   ├── correlation_matrix.png
+│   ├── price_series.png
+│   ├── market_cap_bars.png
 │   ├── signals.csv
 │   ├── analysis_{TICKER}.png   # one per top-5 signal
 │   ├── demo_correlation_matrix.png
@@ -136,8 +138,12 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 
 ## Output Plots (`save_plots=True`)
 
-**`correlation_matrix.png`** — full heatmap of analyzed tickers.
+**`correlation_matrix.png`** — Pearson correlation heatmap for all analyzed tickers.
+
+**`price_series.png`** — Normalized price time series (base = 100) for all tickers. Top 15 most valuable companies (by market cap order) are drawn in distinct colors with labels; all others in light gray.
+
+**`market_cap_bars.png`** — Bar chart of the last closing price for the top 15 most valuable and bottom 15 least valuable companies side by side. Top 15 in green, bottom 15 in coral, with a gap between the two groups.
 
 **`analysis_{TICKER}.png`** — generated for the top 5 signals by predicted return:
-- **Left** — scatter of actual vs predicted cumulative returns with R² trend line.
-- **Right** — normalized price time series (base = 100) of the target + its top 5 correlated tickers. Direct correlators as solid lines, inverse correlators as dashed lines.
+- **Left** — scatter of actual vs predicted cumulative returns (1:1 aspect ratio) with R² trend line.
+- **Right** — normalized price time series of the target + its top 5 correlated tickers. Direct correlators as solid lines, inverse correlators as dashed lines.
