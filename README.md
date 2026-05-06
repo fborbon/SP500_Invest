@@ -1,6 +1,6 @@
 # SP500 Correlation Bot
 
-Algorithmic trading bot for Interactive Brokers that predicts short-term price movements using Pearson correlations across the full S&P 500 universe (~500 tickers). Both direct and inverse correlations are used as predictors with a Random Forest model.
+Algorithmic trading bot for Interactive Brokers that predicts short-term price movements using Pearson correlations across the full S&P 500 universe. Both direct and inverse correlations are used as predictors with a Random Forest model. The number of companies analyzed is configurable at runtime, always selecting the **N most valuable** by market cap.
 
 ## Requirements
 
@@ -18,24 +18,27 @@ pip install ib_insync pandas numpy scikit-learn matplotlib requests nest_asyncio
 # Demo mode — no IB required, synthetic data with inverse correlations
 python main.py demo
 
-# Generate signals only (requires IB Gateway on port 7497)
-python main.py signals
+# Top 50 companies by market cap, signals only
+python main.py signals 50
 
-# Paper trading — executes orders on simulated account
+# Top 100 companies, paper trading
+python main.py paper 100
+
+# Full S&P 500 (~503 tickers), paper trading
 python main.py paper
 
 # Live trading — real money, requires manual confirmation
-python main.py live
+python main.py live 50
 ```
 
-Or use `Main.ipynb` in Jupyter by setting the `mode` variable in the second cell.
+Or use `Main.ipynb` in Jupyter — set `n_tickers` and `mode` in the run cell.
 
 ## File Structure
 
 ```
 V3/
 ├── config.py               # All constants + OUTPUTS_DIR path
-├── main.py                 # run_bot() + CLI entry point (full S&P 500)
+├── main.py                 # run_bot(n_tickers) + CLI entry point
 ├── demo.py                 # run_demo() — synthetic data, no IB connection needed
 │
 ├── broker/
@@ -46,7 +49,8 @@ V3/
 │
 ├── analysis/
 │   ├── __init__.py
-│   ├── universe.py         # get_sp500_tickers() — fetches ~500 tickers from Wikipedia
+│   ├── universe.py         # get_sp500_tickers(n) — top N by market cap via
+│   │                       # slickcharts.com; falls back to Wikipedia, then top-20
 │   ├── correlations.py     # compute_correlations(), get_top_correlated_pairs(),
 │   │                       # get_top_inverse_pairs()
 │   ├── model.py            # predict_price() — RandomForestRegressor + TimeSeriesSplit;
@@ -85,20 +89,30 @@ V3/
 | `BUY_THRESHOLD` | `0.02` | Predicted return > 2% → BUY |
 | `SELL_THRESHOLD` | `-0.02` | Predicted return < −2% → SELL |
 | `MAX_POSITION_PCT` | `0.05` | Max 5% of portfolio per position |
-| `FALLBACK_TICKERS` | top 20 | Used when Wikipedia is unreachable or in demo mode |
+| `FALLBACK_TICKERS` | top 20 | Used when all online sources fail |
+
+## Selecting Companies
+
+`get_sp500_tickers(n)` fetches the **N most valuable** S&P 500 companies at runtime:
+
+| Source | Order | Used when |
+|---|---|---|
+| slickcharts.com | By S&P 500 weight ≈ market cap ✓ | Primary |
+| Wikipedia | Alphabetical ⚠ | slickcharts unreachable |
+| `FALLBACK_TICKERS` | Hardcoded top-20 | Both sources fail |
 
 ## Prediction Model
 
-`predict_price()` uses a **RandomForestRegressor** (200 trees, `max_depth=4`, `min_samples_leaf=10`) validated with `TimeSeriesSplit`. No feature scaling is needed since trees are scale-invariant. The model returns `y_actual` and `y_predicted` arrays so the scatter plot can be built without re-running the model.
+`predict_price()` uses a **RandomForestRegressor** (200 trees, `max_depth=4`, `min_samples_leaf=10`) validated with `TimeSeriesSplit`. No feature scaling needed — trees are scale-invariant. Returns `y_actual` and `y_predicted` arrays for the scatter plot.
 
 ## Inverse Correlation Logic
 
-Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as predictors regardless of sign. The Random Forest assigns the correct weight to each — inverse correlators (r < 0) contribute negatively to the prediction. The report labels them as **↓ inverso** and lists the most negatively correlated pairs under **↑↓ TOP 5 PARES CORRELACIÓN INVERSA**.
+Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as predictors regardless of sign. The Random Forest assigns the correct weight to each — inverse correlators (r < 0) contribute negatively to the prediction. The report labels them **↓ inverso** and lists the most negatively correlated pairs under **↑↓ TOP 5 PARES CORRELACIÓN INVERSA**.
 
 ## Output Plots (`save_plots=True`)
 
-**`correlation_matrix.png`** — full S&P 500 heatmap.
+**`correlation_matrix.png`** — full heatmap of analyzed tickers.
 
 **`analysis_{TICKER}.png`** — generated for the top 5 signals by predicted return:
 - **Left** — scatter of actual vs predicted cumulative returns with R² trend line.
-- **Right** — normalized price time series (base = 100) of the target + its top 5 correlated tickers. Direct correlators drawn as solid lines, inverse correlators as dashed lines.
+- **Right** — normalized price time series (base = 100) of the target + its top 5 correlated tickers. Direct correlators as solid lines, inverse correlators as dashed lines.
