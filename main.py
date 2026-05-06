@@ -45,10 +45,8 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True):
         if save_plots:
             plot_correlation_matrix(corr_matrix)
 
-            # Generate dual-subplot analysis for top 5 actionable signals
-            top_signals = signals_df[
-                signals_df['signal'].isin(['BUY', 'SELL'])
-            ].head(5)
+            # Generate dual-subplot analysis for top 5 signals by predicted return
+            top_signals = signals_df.head(5)
 
             if not top_signals.empty:
                 print("\nGenerando gráficos de análisis...")
