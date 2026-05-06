@@ -99,7 +99,12 @@ V3/
 |---|---|---|
 | slickcharts.com | By S&P 500 weight ≈ market cap ✓ | Primary |
 | Wikipedia | Alphabetical ⚠ | slickcharts unreachable |
-| `FALLBACK_TICKERS` | Hardcoded top-20 | Both sources fail |
+| `FALLBACK_TICKERS` | Hardcoded top-20 | Both sources fail, or `n_tickers='FALLBACK_TICKERS'` |
+
+`n_tickers` accepts three types:
+- **`int`** — top N companies by market cap (e.g. `50`)
+- **`None`** — full S&P 500 (~503 tickers)
+- **`'FALLBACK_TICKERS'`** — hardcoded top-20 list, no web request
 
 ## Prediction Model
 

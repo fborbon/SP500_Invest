@@ -8,18 +8,24 @@ from config import FALLBACK_TICKERS
 _HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 
 
-def get_sp500_tickers(n: int = None) -> list:
+def get_sp500_tickers(n=None) -> list:
     """Return S&P 500 tickers sorted by market cap (index weight).
 
     Args:
-        n: Number of top companies by market cap to return.
-           None = all constituents (~503).
+        n: Controls which tickers are returned:
+           - None              → all S&P 500 constituents (~503).
+           - int               → top N companies by market cap.
+           - 'FALLBACK_TICKERS'→ hardcoded top-20 list from config, no web request.
 
-    Sources tried in order:
+    Sources tried in order (unless n='FALLBACK_TICKERS'):
       1. slickcharts.com  — already ranked by S&P 500 weight (≈ market cap).
       2. Wikipedia        — fallback, alphabetical order (warns user).
       3. FALLBACK_TICKERS — hardcoded top-20 when both sources fail.
     """
+    if n == 'FALLBACK_TICKERS':
+        print(f"  → Usando FALLBACK_TICKERS ({len(FALLBACK_TICKERS)} tickers hardcoded)")
+        return list(FALLBACK_TICKERS)
+
     tickers = _fetch_sorted_tickers()
 
     total = len(tickers)

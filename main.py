@@ -87,7 +87,10 @@ if __name__ == '__main__':
     import config
 
     mode     = sys.argv[1] if len(sys.argv) > 1 else 'demo'
-    n        = int(sys.argv[2]) if len(sys.argv) > 2 else None
+    _n_arg   = sys.argv[2] if len(sys.argv) > 2 else None
+    n        = (_n_arg if _n_arg == 'FALLBACK_TICKERS'
+                else int(_n_arg) if _n_arg is not None
+                else None)
 
     if mode == 'demo':
         run_demo()

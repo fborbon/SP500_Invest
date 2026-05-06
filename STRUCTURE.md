@@ -79,7 +79,9 @@ python main.py paper          # full ~503 tickers
 |---|---|---|
 | slickcharts.com | By S&P 500 weight ≈ market cap ✓ | Primary |
 | Wikipedia | Alphabetical ⚠ | slickcharts unreachable |
-| `FALLBACK_TICKERS` | Hardcoded top-20 | Both sources fail |
+| `FALLBACK_TICKERS` | Hardcoded top-20 | Both sources fail, or `n_tickers='FALLBACK_TICKERS'` |
+
+`n_tickers` accepts: **`int`** (top N), **`None`** (full S&P 500), **`'FALLBACK_TICKERS'`** (hardcoded top-20, no web request).
 
 ## Prediction model (`analysis/model.py`)
 
