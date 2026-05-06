@@ -140,7 +140,9 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 
 **`correlation_matrix.png`** — Pearson correlation heatmap for all analyzed tickers.
 
-**`price_series.png`** — Normalized price time series (base = 100) for all tickers. Top 15 most valuable companies (by market cap order) are drawn in distinct colors with labels; all others in light gray.
+**`price_series.png`** — Two-subplot price time series. Top 15 most valuable companies in distinct colors with labels; all others in light gray.
+- **Top subplot** — normalized prices (base = 100) for relative performance comparison.
+- **Bottom subplot** — absolute close prices ($) for the same tickers.
 
 **`market_cap_bars.png`** — Two-subplot bar chart for top 15 and bottom 15 companies (by market cap order), with a gap between groups. Top 15 in green, bottom 15 in coral.
 - **Top subplot** — last closing stock price ($).

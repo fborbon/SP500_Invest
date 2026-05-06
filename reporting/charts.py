@@ -33,42 +33,57 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
 
 
 def plot_price_series(prices_df, tickers_ordered, top_n=15, save_path=None):
-    """Normalized price time series for all tickers in prices_df.
+    """Two-subplot price time series for all tickers in prices_df.
 
-    The top_n most valuable companies (by order in tickers_ordered, which is
-    sorted by market cap) are drawn in distinct colors with labels.
-    All remaining tickers are drawn as thin light-gray lines without labels.
+    Top subplot    — normalized prices (base = 100).
+    Bottom subplot — absolute close prices ($).
+
+    Top N most valuable companies (by market cap order) drawn in distinct
+    colors with labels; all others as thin light-gray lines without labels.
+    Both subplots share the same X axis and color coding.
     """
     if save_path is None:
         save_path = OUTPUTS_DIR / 'price_series.png'
 
-    # Identify top N tickers that actually have price data
     top_tickers = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
     colors = plt.cm.tab20.colors
 
-    fig, ax = plt.subplots(figsize=(18, 8))
+    fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
+                                           gridspec_kw={'hspace': 0.06})
+    fig.suptitle(f'S&P 500 Price Series — Top {len(top_tickers)} by market cap highlighted',
+                 fontsize=13, fontweight='bold')
 
     def normalize(series):
         return series / series.iloc[0] * 100
 
-    # Background — all non-top tickers in gray
-    for ticker in prices_df.columns:
-        if ticker not in top_tickers:
-            ax.plot(prices_df.index, normalize(prices_df[ticker]),
-                    color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+    for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
+        # Background — all non-top tickers in gray
+        for ticker in prices_df.columns:
+            if ticker not in top_tickers:
+                data = normalize(prices_df[ticker]) if use_norm else prices_df[ticker]
+                ax.plot(prices_df.index, data,
+                        color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
 
-    # Foreground — top N tickers in color with labels
-    for idx, ticker in enumerate(top_tickers):
-        ax.plot(prices_df.index, normalize(prices_df[ticker]),
-                color=colors[idx % 20], linewidth=1.6, alpha=0.9,
-                label=ticker, zorder=2)
+        # Foreground — top N tickers in color with labels
+        for idx, ticker in enumerate(top_tickers):
+            data = normalize(prices_df[ticker]) if use_norm else prices_df[ticker]
+            ax.plot(prices_df.index, data,
+                    color=colors[idx % 20], linewidth=1.6, alpha=0.9,
+                    label=ticker, zorder=2)
 
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Normalized price (base = 100)')
-    ax.set_title(f'S&P 500 Price Series — Top {len(top_tickers)} by market cap highlighted')
-    ax.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-    ax.grid(True, alpha=0.2)
-    ax.tick_params(axis='x', rotation=30)
+        ax.grid(True, alpha=0.2)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    ax_norm.set_ylabel('Normalized price (base = 100)')
+    ax_norm.set_title('Normalized prices')
+    ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+
+    ax_abs.set_ylabel('Close price ($)')
+    ax_abs.set_title('Absolute prices')
+    ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+    ax_abs.set_xlabel('Date')
+    ax_abs.tick_params(axis='x', rotation=30)
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
