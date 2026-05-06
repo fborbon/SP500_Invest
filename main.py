@@ -5,7 +5,7 @@ from config import MIN_R2, OUTPUTS_DIR
 from broker.connection import connect_ib
 from broker.data import fetch_prices
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
-from analysis.universe import get_sp500_tickers
+from analysis.universe import fetch_market_caps, get_sp500_tickers
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
@@ -34,6 +34,8 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             print("✗ Insufficient data. Aborting.")
             return
 
+        market_caps = fetch_market_caps(list(prices_df.columns))
+
         print("\nCalculating correlations...")
         corr_matrix, returns = compute_correlations(prices_df)
         top_pairs     = get_top_correlated_pairs(corr_matrix, top_n=10)
@@ -49,8 +51,8 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             # All tickers in gray, top 15 most valuable in color
             plot_price_series(prices_df, tickers, top_n=15)
 
-            # Top 15 vs bottom 15 companies by market cap
-            plot_market_cap_bars(prices_df, tickers, top_n=15)
+            # Top 15 vs bottom 15 — stock price (top) and market cap (bottom)
+            plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15)
 
             # Dual-subplot analysis for top 5 signals by predicted return
             top_signals = signals_df.head(5)  # Top 5 most valuable tickers

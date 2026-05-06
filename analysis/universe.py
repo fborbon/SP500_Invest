@@ -1,7 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 
 import pandas as pd
 import requests
+import yfinance as yf
 
 from config import FALLBACK_TICKERS
 
@@ -36,6 +38,31 @@ def get_sp500_tickers(n=None) -> list:
         print(f"  → Using all {total} S&P 500 tickers")
 
     return tickers
+
+
+def fetch_market_caps(tickers: list) -> dict:
+    """Fetch market capitalization for each ticker via yfinance (free, no API key).
+
+    Uses 30 parallel threads. Yahoo Finance uses '-' instead of '.' in tickers
+    (e.g. BRK-B), so dots are converted automatically.
+
+    Returns dict mapping original ticker → market cap in USD (0 if unavailable).
+    """
+    def _get_cap(ticker):
+        yf_ticker = ticker.replace('.', '-')
+        try:
+            cap = yf.Ticker(yf_ticker).fast_info['market_cap']
+            return ticker, cap if cap else 0
+        except Exception:
+            return ticker, 0
+
+    print(f"\nFetching market caps for {len(tickers)} tickers via yfinance...")
+    with ThreadPoolExecutor(max_workers=30) as executor:
+        results = dict(executor.map(_get_cap, tickers))
+
+    fetched = sum(1 for v in results.values() if v > 0)
+    print(f"  ✓ Market caps retrieved: {fetched}/{len(tickers)}")
+    return results
 
 
 def _fetch_sorted_tickers() -> list:

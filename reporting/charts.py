@@ -76,48 +76,88 @@ def plot_price_series(prices_df, tickers_ordered, top_n=15, save_path=None):
     print(f"  Price series saved to: {save_path}")
 
 
-def plot_market_cap_bars(prices_df, tickers_ordered, top_n=15, save_path=None):
-    """Bar chart of current stock price for the top N and bottom N companies.
+def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
+                         top_n=15, save_path=None):
+    """Two-subplot bar chart for top N and bottom N companies (by market cap order).
 
-    Companies are ordered by market cap via tickers_ordered (slickcharts ranking).
-    Top N shown in green on the left, bottom N in coral on the right, separated
-    by a gap. X axis = ticker, Y axis = last closing price.
+    Top subplot    — last closing stock price ($).
+    Bottom subplot — market capitalization ($B), requires market_caps dict.
+                     If market_caps is None the bottom subplot is skipped.
+
+    Both subplots share the same X axis (same companies, same order).
+    Top N shown in green, bottom N in coral, with a gap between groups.
     """
     if save_path is None:
         save_path = OUTPUTS_DIR / 'market_cap_bars.png'
 
-    available = [t for t in tickers_ordered if t in prices_df.columns]
-    top    = available[:top_n]
-    bottom = available[-top_n:] if len(available) >= top_n * 2 else available[top_n:]
+    available     = [t for t in tickers_ordered if t in prices_df.columns]
+    top           = available[:top_n]
+    bottom        = available[-top_n:] if len(available) >= top_n * 2 else available[top_n:]
+    labels        = top + bottom
+    n_bars        = len(labels)
+
+    gap      = 2
+    x_top    = list(range(len(top)))
+    x_bottom = [x + len(top) + gap for x in range(len(bottom))]
+    x_all    = x_top + x_bottom
 
     top_prices    = [prices_df[t].iloc[-1] for t in top]
     bottom_prices = [prices_df[t].iloc[-1] for t in bottom]
 
-    # Build x positions with a gap between the two groups
-    gap = 2
-    x_top    = list(range(len(top)))
-    x_bottom = [x + len(top) + gap for x in range(len(bottom))]
+    n_rows  = 2 if market_caps else 1
+    fig_h   = 7 * n_rows
+    fig_w   = max(16, n_bars * 0.85)
+    fig, axes = plt.subplots(n_rows, 1, figsize=(fig_w, fig_h),
+                             sharex=True,
+                             gridspec_kw={'hspace': 0.08})
+    ax_price = axes[0] if n_rows == 2 else axes
+    fig.suptitle(f'Top {len(top)} vs Bottom {len(bottom)} S&P 500 Companies',
+                 fontsize=13, fontweight='bold', y=1.01)
 
-    fig, ax = plt.subplots(figsize=(max(16, (len(top) + len(bottom)) * 0.8), 7))
+    # ── Top subplot: last close price ────────────────────────
+    def _bar_labels(ax, bars, fmt):
+        for bar in bars:
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() * 1.01,
+                    fmt(bar.get_height()),
+                    ha='center', va='bottom', fontsize=7, rotation=45)
 
-    bars_top    = ax.bar(x_top,    top_prices,    color='mediumseagreen', alpha=0.85,
-                         edgecolor='white', linewidth=0.5, label=f'Top {len(top)} (most valuable)')
-    bars_bottom = ax.bar(x_bottom, bottom_prices, color='tomato',         alpha=0.85,
-                         edgecolor='white', linewidth=0.5, label=f'Bottom {len(bottom)} (least valuable)')
+    bt = ax_price.bar(x_top,    top_prices,    color='mediumseagreen', alpha=0.85,
+                      edgecolor='white', linewidth=0.5,
+                      label=f'Top {len(top)} (most valuable)')
+    bb = ax_price.bar(x_bottom, bottom_prices, color='tomato',         alpha=0.85,
+                      edgecolor='white', linewidth=0.5,
+                      label=f'Bottom {len(bottom)} (least valuable)')
+    _bar_labels(ax_price, bt + bb, lambda v: f'${v:,.0f}')
+    ax_price.set_ylabel('Last Close Price ($)')
+    ax_price.set_title('Stock Price')
+    ax_price.legend(fontsize=8)
+    ax_price.grid(axis='y', alpha=0.25)
+    ax_price.spines['top'].set_visible(False)
+    ax_price.spines['right'].set_visible(False)
 
-    # Value labels on top of each bar
-    for bar in bars_top + bars_bottom:
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + bar.get_height() * 0.01,
-                f'${bar.get_height():,.0f}', ha='center', va='bottom', fontsize=7, rotation=45)
+    # ── Bottom subplot: market capitalisation ─────────────────
+    if market_caps:
+        ax_mcap = axes[1]
+        top_caps    = [market_caps.get(t, 0) / 1e9 for t in top]
+        bottom_caps = [market_caps.get(t, 0) / 1e9 for t in bottom]
 
-    ax.set_xticks(x_top + x_bottom)
-    ax.set_xticklabels(top + bottom, rotation=45, ha='right', fontsize=9)
-    ax.set_ylabel('Last Close Price ($)')
-    ax.set_title(f'Top {len(top)} vs Bottom {len(bottom)} S&P 500 Companies — Last Close Price')
-    ax.legend(fontsize=9)
-    ax.grid(axis='y', alpha=0.25)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+        bt2 = ax_mcap.bar(x_top,    top_caps,    color='mediumseagreen', alpha=0.85,
+                          edgecolor='white', linewidth=0.5)
+        bb2 = ax_mcap.bar(x_bottom, bottom_caps, color='tomato',         alpha=0.85,
+                          edgecolor='white', linewidth=0.5)
+        _bar_labels(ax_mcap, bt2 + bb2,
+                    lambda v: f'${v/1e3:.1f}T' if v >= 1000 else f'${v:.0f}B')
+        ax_mcap.set_ylabel('Market Cap ($B)')
+        ax_mcap.set_title('Market Capitalization')
+        ax_mcap.set_xticks(x_all)
+        ax_mcap.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
+        ax_mcap.grid(axis='y', alpha=0.25)
+        ax_mcap.spines['top'].set_visible(False)
+        ax_mcap.spines['right'].set_visible(False)
+    else:
+        ax_price.set_xticks(x_all)
+        ax_price.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')

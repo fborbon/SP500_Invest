@@ -5,7 +5,7 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term price m
 ## Requirements
 
 ```bash
-pip install ib_insync pandas numpy scikit-learn matplotlib requests nest_asyncio
+pip install ib_insync pandas numpy scikit-learn matplotlib requests yfinance nest_asyncio
 ```
 
 - Interactive Brokers TWS or IB Gateway running locally
@@ -49,8 +49,8 @@ V3/
 │
 ├── analysis/
 │   ├── __init__.py
-│   ├── universe.py         # get_sp500_tickers(n) — top N by market cap via
-│   │                       # slickcharts.com; falls back to Wikipedia, then top-20
+│   ├── universe.py         # get_sp500_tickers(n); fetch_market_caps() via yfinance
+│   │                       # slickcharts.com primary; falls back to Wikipedia, then top-20
 │   ├── correlations.py     # compute_correlations(), get_top_correlated_pairs(),
 │   │                       # get_top_inverse_pairs()
 │   ├── model.py            # predict_price() — RandomForestRegressor + TimeSeriesSplit;
@@ -142,7 +142,9 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 
 **`price_series.png`** — Normalized price time series (base = 100) for all tickers. Top 15 most valuable companies (by market cap order) are drawn in distinct colors with labels; all others in light gray.
 
-**`market_cap_bars.png`** — Bar chart of the last closing price for the top 15 most valuable and bottom 15 least valuable companies side by side. Top 15 in green, bottom 15 in coral, with a gap between the two groups.
+**`market_cap_bars.png`** — Two-subplot bar chart for top 15 and bottom 15 companies (by market cap order), with a gap between groups. Top 15 in green, bottom 15 in coral.
+- **Top subplot** — last closing stock price ($).
+- **Bottom subplot** — market capitalization ($B / $T) fetched live from Yahoo Finance via `yfinance`.
 
 **`analysis_{TICKER}.png`** — generated for the top 5 signals by predicted return:
 - **Left** — scatter of actual vs predicted cumulative returns (1:1 aspect ratio) with R² trend line.
