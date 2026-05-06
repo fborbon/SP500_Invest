@@ -1,6 +1,6 @@
 from ib_insync import IB, LimitOrder, MarketOrder, Trade
 
-from config import MAX_POSITION_PCT
+from config import FALLBACK_PORTFOLIO, MAX_POSITION_PCT
 from broker.connection import get_contract
 
 
@@ -9,7 +9,7 @@ def get_portfolio_value(ib: IB) -> float:
     for av in ib.accountSummary():
         if av.tag == 'NetLiquidation' and av.currency == 'USD':
             return float(av.value)
-    return 100_000.0   # fallback
+    return FALLBACK_PORTFOLIO
 
 
 def calculate_position_size(portfolio_value: float, price: float,

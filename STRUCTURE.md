@@ -69,6 +69,7 @@ python main.py paper          # full ~503 tickers
 | `BUY_THRESHOLD` | `0.02` | Predicted return > 2% → BUY |
 | `SELL_THRESHOLD` | `-0.02` | Predicted return < −2% → SELL |
 | `MAX_POSITION_PCT` | `0.05` | Max 5% of portfolio per position |
+| `FALLBACK_PORTFOLIO` | `1000.0` | Portfolio value used when IB does not return NetLiquidation |
 | `FALLBACK_TICKERS` | top 20 | Used when all online sources fail |
 
 ## Selecting companies (`analysis/universe.py`)
