@@ -66,6 +66,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
 
     ax_sc.axhline(0, color='grey', linewidth=0.5, alpha=0.6)
     ax_sc.axvline(0, color='grey', linewidth=0.5, alpha=0.6)
+    ax_sc.set_aspect('equal', adjustable='box')
     ax_sc.set_xlabel('Retorno real acumulado (%)')
     ax_sc.set_ylabel('Retorno predicho (%)')
     ax_sc.set_title('Real vs Predicho (in-sample)')
