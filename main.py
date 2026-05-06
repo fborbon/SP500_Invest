@@ -46,6 +46,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             plot_correlation_matrix(corr_matrix)
 
             # Generate dual-subplot analysis for top 5 signals by predicted return
+            # Hardcoded. Top 5 most valuable tickers 
             top_signals = signals_df.head(5)
 
             if not top_signals.empty:

@@ -71,7 +71,7 @@ def predict_price(target: str, returns: pd.DataFrame, corr_matrix: pd.DataFrame,
     y_predicted  = model.predict(X_train)
     pred_return  = float(model.predict(X[-1:].reshape(1, -1))[0])
 
-    top5       = pred_cols[:5]
+    top5       = pred_cols[:5]  # Hardcoded. Top 5 most correlated tickers for target
     corr_signs = {col: float(corr_matrix[target][col]) for col in top5}
 
     return pred_return, r2, top5, corr_signs, y_train, y_predicted

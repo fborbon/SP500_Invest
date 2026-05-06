@@ -16,3 +16,6 @@ outputs/*.csv
 # Environment / secrets
 .env
 *.env
+
+# Claude Code local memory
+.claude/
