@@ -7,8 +7,9 @@ from broker.data import fetch_prices
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
 from analysis.universe import get_sp500_tickers
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
+from analysis.model import predict_price
 from analysis.signals import generate_signals
-from reporting.charts import plot_correlation_matrix
+from reporting.charts import plot_correlation_matrix, plot_prediction_analysis
 from reporting.report import print_report, save_signals_csv
 
 
@@ -16,11 +17,11 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True):
     """Full pipeline: connect → download → correlate → predict → signal → (trade).
 
     Uses the full S&P 500 universe (~500 tickers). Both direct and inverse
-    correlations are used as predictors.
+    correlations are used as predictors via RandomForestRegressor.
 
     Args:
         execute_trades: If True, places real orders in IB. Use with caution.
-        save_plots:     If True, saves the correlation heatmap as PNG.
+        save_plots:     If True, saves heatmap + per-signal prediction analysis PNGs.
     """
     ib = connect_ib()
     try:
@@ -37,12 +38,31 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True):
         top_pairs     = get_top_correlated_pairs(corr_matrix, top_n=10)
         inverse_pairs = get_top_inverse_pairs(corr_matrix, top_n=10)
 
-        if save_plots:
-            plot_correlation_matrix(corr_matrix)
-
         signals_df = generate_signals(prices_df, returns, corr_matrix)
         print_report(signals_df, top_pairs, inverse_pairs)
         save_signals_csv(signals_df)
+
+        if save_plots:
+            plot_correlation_matrix(corr_matrix)
+
+            # Generate dual-subplot analysis for top 5 actionable signals
+            top_signals = signals_df[
+                signals_df['signal'].isin(['BUY', 'SELL'])
+            ].head(5)
+
+            if not top_signals.empty:
+                print("\nGenerando gráficos de análisis...")
+            for _, row in top_signals.iterrows():
+                ticker = row['ticker']
+                pred_ret, r2, top5, corr_signs, y_actual, y_pred = predict_price(
+                    ticker, returns, corr_matrix
+                )
+                if y_actual is not None:
+                    plot_prediction_analysis(
+                        ticker, returns, prices_df, top5, corr_signs,
+                        y_actual, y_pred,
+                        save_path=OUTPUTS_DIR / f'analysis_{ticker}.png'
+                    )
 
         if execute_trades:
             portfolio_value = get_portfolio_value(ib)

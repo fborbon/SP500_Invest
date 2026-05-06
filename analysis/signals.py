@@ -18,7 +18,7 @@ def generate_signals(prices_df: pd.DataFrame, returns: pd.DataFrame,
 
     print(f"\nGenerando señales de predicción ({total} tickers)...")
     for i, ticker in enumerate(returns.columns, 1):
-        pred_ret, r2, top_preds, corr_signs = predict_price(ticker, returns, corr_matrix)
+        pred_ret, r2, top_preds, corr_signs, _, _ = predict_price(ticker, returns, corr_matrix)
 
         if pred_ret is None:
             signal = 'INSUF_DATA'
@@ -44,8 +44,8 @@ def generate_signals(prices_df: pd.DataFrame, returns: pd.DataFrame,
             'target_price_7d':     round(target, 2) if not np.isnan(target) else None,
             'predicted_return':    round(pred_ret * 100, 2) if pred_ret is not None else None,
             'model_r2':            round(r2, 3),
-            'direct_predictors':   ', '.join(direct),
-            'inverse_predictors':  ', '.join(inverse),
+            'direct_top5_predictors':   ', '.join(direct),
+            'inverse_top5_predictors':  ', '.join(inverse),
             'signal':              signal,
         })
 
@@ -56,5 +56,5 @@ def generate_signals(prices_df: pd.DataFrame, returns: pd.DataFrame,
               f"ret={ret_str}  R²={r2:.2f}  [{signal}]{inv_str}")
 
     df = pd.DataFrame(signals)
-    df.sort_values('predicted_return', ascending=False, inplace=True, na_position='last')
+    df.sort_values('predicted_return', ascending=False, inplace=True, na_position='last') # Define how to sort the csv file
     return df

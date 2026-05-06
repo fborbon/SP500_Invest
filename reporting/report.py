@@ -23,20 +23,20 @@ def print_report(signals_df: pd.DataFrame, top_pairs: list,
     for _, r in buys.iterrows():
         print(f"  ▲ {r['ticker']:<6} ${r['current_price']:.2f} → ${r['target_price_7d']:.2f}  "
               f"(+{r['predicted_return']:.1f}%)  R²={r['model_r2']:.2f}")
-        if r['direct_predictors']:
-            print(f"      ↑ directo:   {r['direct_predictors']}")
-        if r['inverse_predictors']:
-            print(f"      ↓ inverso:   {r['inverse_predictors']}")
+        if r['direct_top5_predictors']:
+            print(f"      ↑ directo:   {r['direct_top5_predictors']}")
+        if r['inverse_top5_predictors']:
+            print(f"      ↓ inverso:   {r['inverse_top5_predictors']}")
 
     if not sells.empty:
         print("\n  ── VENTAS ───────────────────────────────────────────")
         for _, r in sells.iterrows():
             print(f"  ▼ {r['ticker']:<6} ${r['current_price']:.2f} → ${r['target_price_7d']:.2f}  "
                   f"({r['predicted_return']:.1f}%)  R²={r['model_r2']:.2f}")
-            if r['direct_predictors']:
-                print(f"      ↑ directo:   {r['direct_predictors']}")
-            if r['inverse_predictors']:
-                print(f"      ↓ inverso:   {r['inverse_predictors']}")
+            if r['direct_top5_predictors']:
+                print(f"      ↑ directo:   {r['direct_top5_predictors']}")
+            if r['inverse_top5_predictors']:
+                print(f"      ↓ inverso:   {r['inverse_top5_predictors']}")
 
     print("\n  ── TOP 5 PARES CORRELACIÓN DIRECTA ─────────────────")
     for a, b, r in top_pairs[:5]:
