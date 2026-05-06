@@ -8,9 +8,12 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term price m
 pip install ib_insync pandas numpy scikit-learn matplotlib requests yfinance nest_asyncio
 ```
 
-- Interactive Brokers TWS or IB Gateway running locally
+- Interactive Brokers TWS or IB Gateway running locally (only needed to place orders)
 - Port `7497` for paper trading (recommended for testing)
 - Port `7496` for live trading (use with caution)
+
+> **Price data** is fetched from Yahoo Finance via `yfinance` (free, no IB needed).
+> IB is only connected when `execute_trades=True` to place the actual orders.
 
 ## Usage
 
@@ -44,7 +47,7 @@ V3/
 ├── broker/
 │   ├── __init__.py
 │   ├── connection.py       # connect_ib(), get_contract(), nest_asyncio fix
-│   ├── data.py             # fetch_prices(); auto-converts days→years for IB API
+│   ├── data.py             # fetch_prices() via IB; fetch_prices_free() via yfinance
 │   └── orders.py           # execute_order(), close_position(), calculate_position_size()
 │
 ├── analysis/
