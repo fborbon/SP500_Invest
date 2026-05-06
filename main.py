@@ -13,20 +13,20 @@ from reporting.charts import plot_correlation_matrix, plot_prediction_analysis
 from reporting.report import print_report, save_signals_csv
 
 
-def run_bot(execute_trades: bool = False, save_plots: bool = True):
+def run_bot(execute_trades: bool = False, save_plots: bool = True,
+            n_tickers: int = None):
     """Full pipeline: connect → download → correlate → predict → signal → (trade).
-
-    Uses the full S&P 500 universe (~500 tickers). Both direct and inverse
-    correlations are used as predictors via RandomForestRegressor.
 
     Args:
         execute_trades: If True, places real orders in IB. Use with caution.
         save_plots:     If True, saves heatmap + per-signal prediction analysis PNGs.
+        n_tickers:      Number of top S&P 500 companies by market cap to use.
+                        None = full universe (~503 tickers).
     """
     ib = connect_ib()
     try:
         print("\nObteniendo universo S&P 500...")
-        tickers = get_sp500_tickers()
+        tickers = get_sp500_tickers(n=n_tickers)
 
         prices_df = fetch_prices(ib, tickers)
         if prices_df.empty or len(prices_df.columns) < 5:
@@ -86,24 +86,25 @@ if __name__ == '__main__':
     from demo import run_demo
     import config
 
-    mode = sys.argv[1] if len(sys.argv) > 1 else 'demo'
+    mode     = sys.argv[1] if len(sys.argv) > 1 else 'demo'
+    n        = int(sys.argv[2]) if len(sys.argv) > 2 else None
 
     if mode == 'demo':
         run_demo()
 
     elif mode == 'paper':
-        run_bot(execute_trades=True)
+        run_bot(execute_trades=True, n_tickers=n)
 
     elif mode == 'live':
         confirm = input("¿Confirmas ejecución en cuenta REAL? (escribe SI): ")
         if confirm.strip() == 'SI':
             config.IB_PORT = 7496   # override before connect_ib() reads it
-            run_bot(execute_trades=True)
+            run_bot(execute_trades=True, n_tickers=n)
         else:
             print("Cancelado.")
 
     elif mode == 'signals':
-        run_bot(execute_trades=False)
+        run_bot(execute_trades=False, n_tickers=n)
 
     else:
-        print("Uso: python main.py [demo|paper|live|signals]")
+        print("Uso: python main.py [demo|paper|live|signals] [n_tickers]")
