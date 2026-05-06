@@ -85,10 +85,10 @@ V3/
 | `HISTORY_DAYS` | `800` | Trading days of history (>365 auto-converts to years for IB) |
 | `PREDICTION_DAYS` | `7` | Forecast horizon (days) |
 | `MIN_CORRELATION` | `0.50` | Minimum absolute Pearson r to use a predictor (direct or inverse) |
-| `MIN_R2` | `0.25` | Minimum R² to trust a signal |
-| `BUY_THRESHOLD` | `0.02` | Predicted return > 2% → BUY |
-| `SELL_THRESHOLD` | `-0.02` | Predicted return < −2% → SELL |
-| `MAX_POSITION_PCT` | `0.05` | Max 5% of portfolio per position |
+| `MIN_R2` | `0.01` | Minimum R² to trust a signal |
+| `BUY_THRESHOLD` | `0.01` | Predicted return > 1% → BUY |
+| `SELL_THRESHOLD` | `-0.10` | Predicted return < −10% → SELL |
+| `MAX_POSITION_PCT` | `0.10` | Max 10% of portfolio per position |
 | `FALLBACK_PORTFOLIO` | `1000.0` | Portfolio value used when IB does not return NetLiquidation |
 | `FALLBACK_TICKERS` | top 20 | Used when all online sources fail |
 
@@ -115,7 +115,7 @@ The spend per order is calculated in `broker/orders.py`:
 portfolio_value  ×  MAX_POSITION_PCT  ×  signal_strength
 ```
 
-- `MAX_POSITION_PCT = 0.05` → max 5% of portfolio per position
+- `MAX_POSITION_PCT = 0.10` → max 10% of portfolio per position
 - `signal_strength = min(1.0, model_r2)` → scales down if R² < 1.0
 
 Example — $100,000 portfolio, buying a $300 stock with R²=0.6:

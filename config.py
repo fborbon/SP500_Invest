@@ -22,9 +22,9 @@ FALLBACK_TICKERS = [
 HISTORY_DAYS     = 800     # Days of history for correlation calculation
 PREDICTION_DAYS  = 7       # Prediction horizon (days)
 MIN_CORRELATION  = 0.50    # Minimum correlation to use as predictor
-MIN_R2           = 0.0001  # Minimum R² to trust the signal. =0.40
-BUY_THRESHOLD    = 0.01    # Predicted return > 2% → BUY
-SELL_THRESHOLD   = -0.01   # Predicted return < -2% → SELL
+MIN_R2           = 0.01    # Minimum R² to trust the signal. =0.40
+BUY_THRESHOLD    = 0.01    # Predicted return > X% → BUY
+SELL_THRESHOLD   = -0.10   # Predicted return < -X% → SELL
 ORDER_QUANTITY        = 10       # Shares per order (paper trading)
-MAX_POSITION_PCT      = 0.05     # Maximum 5% of portfolio per position
+MAX_POSITION_PCT      = 0.10     # Maximum % of portfolio per position
 FALLBACK_PORTFOLIO    = 1_000.0  # Used when IB does not return NetLiquidation
