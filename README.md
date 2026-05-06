@@ -107,6 +107,25 @@ V3/
 - **`None`** — full S&P 500 (~503 tickers)
 - **`'FALLBACK_TICKERS'`** — hardcoded top-20 list, no web request
 
+## Position Sizing
+
+The spend per order is calculated in `broker/orders.py`:
+
+```
+portfolio_value  ×  MAX_POSITION_PCT  ×  signal_strength
+```
+
+- `MAX_POSITION_PCT = 0.05` → max 5% of portfolio per position
+- `signal_strength = min(1.0, model_r2)` → scales down if R² < 1.0
+
+Example — $100,000 portfolio, buying a $300 stock with R²=0.6:
+```
+max_value = 100,000 × 0.05 × 0.6 = $3,000
+quantity  = int(3,000 / 300)      = 10 shares
+```
+
+To change the spend amount, adjust `MAX_POSITION_PCT` or `FALLBACK_PORTFOLIO` in `config.py`.
+
 ## Prediction Model
 
 `predict_price()` uses a **RandomForestRegressor** (200 trees, `max_depth=4`, `min_samples_leaf=10`) validated with `TimeSeriesSplit`. No feature scaling needed — trees are scale-invariant. Returns `y_actual` and `y_predicted` arrays for the scatter plot.
