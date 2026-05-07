@@ -71,7 +71,8 @@ V3/
 ├── outputs/                # Generated files (PNG, CSV) — git-ignored contents
 │   ├── General/
 │   │   ├── price_series_market-cap.png
-│   │   ├── price_series_stock-price.png
+│   │   ├── price_series_stock-price-absolute.png
+│   │   ├── price_series_normalized-return.png
 │   │   └── market_cap_bars.png
 │   ├── Correlation_method/
 │   │   ├── correlation_matrix.png
@@ -155,7 +156,9 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 - **Top subplot** — normalized prices (base = 100).
 - **Bottom subplot** — absolute close prices ($).
 
-**`General/price_series_stock-price.png`** — Same layout but top 15 highlighted by highest last close stock price.
+**`General/price_series_stock-price-absolute.png`** — Same layout but top 15 highlighted by highest last close stock price ($).
+
+**`General/price_series_normalized-return.png`** — Same layout but top 15 highlighted by highest normalized return (best performers: largest % gain from the start of the history window).
 
 **`General/market_cap_bars.png`** — Two-subplot bar chart for top 15 and bottom 15 companies by market cap.
 - **Top subplot** — last closing stock price ($).

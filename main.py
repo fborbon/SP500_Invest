@@ -60,14 +60,23 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_price_series(prices_df, tickers, top_n=15, label='market cap',
                           save_path=GENERAL_DIR / 'price_series_market-cap.png')
 
-        # General/ — price series highlighted by highest stock price
+        # General/ — price series highlighted by highest absolute stock price
         tickers_by_price = sorted(
             prices_df.columns.tolist(),
             key=lambda t: prices_df[t].iloc[-1],
             reverse=True
         )
         plot_price_series(prices_df, tickers_by_price, top_n=15, label='stock price',
-                          save_path=GENERAL_DIR / 'price_series_stock-price.png')
+                          save_path=GENERAL_DIR / 'price_series_stock-price-absolute.png')
+
+        # General/ — price series highlighted by highest normalized return (best performers)
+        tickers_by_norm = sorted(
+            prices_df.columns.tolist(),
+            key=lambda t: prices_df[t].iloc[-1] / prices_df[t].iloc[0],
+            reverse=True
+        )
+        plot_price_series(prices_df, tickers_by_norm, top_n=15, label='normalized return',
+                          save_path=GENERAL_DIR / 'price_series_normalized-return.png')
 
         # General/ — bar chart: top 15 vs bottom 15 by market cap
         plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15,
