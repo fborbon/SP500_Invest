@@ -7,7 +7,6 @@ import yfinance as yf
 
 from config import FALLBACK_TICKERS
 
-# Full browser-like headers to avoid 403 blocks on financial sites
 _HEADERS = {
     'User-Agent':                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
                                  '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -22,63 +21,81 @@ _HEADERS = {
 
 
 def get_sp500_tickers(n=None) -> list:
-    """Return S&P 500 tickers sorted by market cap (index weight).
+    """Return S&P 500 tickers, optionally filtered to the top N by market cap.
 
     Args:
         n: Controls which tickers are returned:
            - None               → all S&P 500 constituents (~503).
            - int                → top N companies by market cap.
-           - 'FALLBACK_TICKERS' → hardcoded top-20 list from config, no web request.
+           - 'FALLBACK_TICKERS' → hardcoded top-20 list, no web request.
 
-    Sources tried in order (unless n='FALLBACK_TICKERS'):
-      1. slickcharts.com     — pre-ranked by S&P 500 weight (≈ market cap).
-      2. stockanalysis.com   — ranked by market cap.
-      3. Wikipedia           — fallback, alphabetical order (warns user).
-      4. FALLBACK_TICKERS    — hardcoded top-20 when all sources fail.
+    Strategy:
+      1. Try slickcharts.com — pre-ranked, single request, no extra API calls.
+      2. If blocked, fall back to Wikipedia (full list) + yfinance market caps
+         to sort and slice correctly when n is specified.
     """
     if n == 'FALLBACK_TICKERS':
         print(f"  → Using FALLBACK_TICKERS ({len(FALLBACK_TICKERS)} hardcoded tickers)")
         return list(FALLBACK_TICKERS)
 
-    tickers = _fetch_sorted_tickers()
+    # ── Try slickcharts first (pre-ranked, fast) ──────────────────────
+    ranked = _try_slickcharts()
+    if ranked:
+        total = len(ranked)
+        if n is not None:
+            ranked = ranked[:n]
+            print(f"  → Selected top {n} of {total} by market cap")
+        else:
+            print(f"  → Using all {total} S&P 500 tickers")
+        return ranked
 
-    total = len(tickers)
-    if n is not None:
-        tickers = tickers[:n]
-        print(f"  → Selected top {n} of {total} by market cap")
-    else:
-        print(f"  → Using all {total} S&P 500 tickers")
+    # ── Fallback: Wikipedia + yfinance sort ──────────────────────────
+    all_tickers = _fetch_wikipedia()
 
-    return tickers
+    if n is None:
+        print(f"  → Using all {len(all_tickers)} S&P 500 tickers (Wikipedia, alphabetical)")
+        return all_tickers
+
+    # n specified but no ranked source — sort by actual market cap via yfinance
+    print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance"
+          f" to select top {n} (this takes ~30s)...")
+    caps = _fetch_caps_parallel(all_tickers)
+    all_tickers.sort(key=lambda t: caps.get(t, 0), reverse=True)
+    result = all_tickers[:n]
+    print(f"  → Selected top {n} of {len(all_tickers)} by market cap")
+    return result
 
 
 def fetch_market_caps(tickers: list) -> dict:
     """Fetch market capitalization for each ticker via yfinance (free, no API key).
 
-    Uses 30 parallel threads. Yahoo Finance uses '-' instead of '.' in tickers
-    (e.g. BRK-B), so dots are converted automatically.
+    Uses 30 parallel threads. Dot notation is converted to Yahoo Finance format
+    automatically (e.g. BRK.B → BRK-B).
 
     Returns dict mapping original ticker → market cap in USD (0 if unavailable).
     """
+    print(f"\nFetching market caps for {len(tickers)} tickers via yfinance...")
+    caps = _fetch_caps_parallel(tickers)
+    fetched = sum(1 for v in caps.values() if v > 0)
+    print(f"  ✓ Market caps retrieved: {fetched}/{len(tickers)}")
+    return caps
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _fetch_caps_parallel(tickers: list) -> dict:
     def _get_cap(ticker):
-        yf_ticker = ticker.replace('.', '-')
         try:
-            cap = yf.Ticker(yf_ticker).fast_info['market_cap']
+            cap = yf.Ticker(ticker.replace('.', '-')).fast_info['market_cap']
             return ticker, cap if cap else 0
         except Exception:
             return ticker, 0
 
-    print(f"\nFetching market caps for {len(tickers)} tickers via yfinance...")
     with ThreadPoolExecutor(max_workers=30) as executor:
-        results = dict(executor.map(_get_cap, tickers))
-
-    fetched = sum(1 for v in results.values() if v > 0)
-    print(f"  ✓ Market caps retrieved: {fetched}/{len(tickers)}")
-    return results
+        return dict(executor.map(_get_cap, tickers))
 
 
-def _fetch_sorted_tickers() -> list:
-    # ── 1. slickcharts — sorted by portfolio weight (≈ market cap) ──────
+def _try_slickcharts() -> list:
     try:
         resp = requests.get('https://slickcharts.com/sp500',
                             headers=_HEADERS, timeout=15)
@@ -88,23 +105,11 @@ def _fetch_sorted_tickers() -> list:
         print(f"  ✓ {len(tickers)} tickers fetched from slickcharts (sorted by market cap)")
         return tickers
     except Exception as e:
-        print(f"  ✗ slickcharts unavailable ({e}), trying stockanalysis.com...")
+        print(f"  ✗ slickcharts unavailable ({e}), falling back to Wikipedia + yfinance sort...")
+        return []
 
-    # ── 2. stockanalysis.com — sorted by market cap ───────────────────────
-    try:
-        resp = requests.get('https://stockanalysis.com/list/sp-500/',
-                            headers=_HEADERS, timeout=15)
-        resp.raise_for_status()
-        table = pd.read_html(StringIO(resp.text))[0]
-        # Column is 'Symbol' or 'Ticker' depending on page version
-        col = 'Symbol' if 'Symbol' in table.columns else 'Ticker'
-        tickers = table[col].str.strip().tolist()
-        print(f"  ✓ {len(tickers)} tickers fetched from stockanalysis.com (sorted by market cap)")
-        return tickers
-    except Exception as e:
-        print(f"  ✗ stockanalysis.com unavailable ({e}), trying Wikipedia...")
 
-    # ── 3. Wikipedia — alphabetical, not sorted by market cap ────────────
+def _fetch_wikipedia() -> list:
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
         resp = requests.get(url, headers=_HEADERS, timeout=15)
@@ -112,7 +117,6 @@ def _fetch_sorted_tickers() -> list:
         table = pd.read_html(StringIO(resp.text), attrs={'id': 'constituents'})[0]
         tickers = table['Symbol'].tolist()
         print(f"  ✓ {len(tickers)} tickers fetched from Wikipedia")
-        print("  ⚠ Wikipedia is not sorted by market cap — plots will use yfinance caps for ordering.")
         return tickers
     except Exception as e:
         print(f"  ✗ Wikipedia unavailable ({e}). Using fallback list.")
