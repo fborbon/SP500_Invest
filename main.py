@@ -34,6 +34,14 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
 
     market_caps = fetch_market_caps(list(prices_df.columns))
 
+    # Re-sort tickers by actual market cap so plots always show the correct top/bottom N
+    # regardless of which source (slickcharts / stockanalysis / Wikipedia) was used.
+    tickers_by_mcap = sorted(
+        prices_df.columns.tolist(),
+        key=lambda t: market_caps.get(t, 0),
+        reverse=True
+    )
+
     print("\nCalculating correlations...")
     corr_matrix, returns = compute_correlations(prices_df)
     top_pairs     = get_top_correlated_pairs(corr_matrix, top_n=10)
@@ -47,10 +55,10 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_correlation_matrix(corr_matrix)
 
         # All tickers in gray, top 15 most valuable in color
-        plot_price_series(prices_df, tickers, top_n=15)
+        plot_price_series(prices_df, tickers_by_mcap, top_n=15)
 
         # Top 15 vs bottom 15 — stock price (top) and market cap (bottom)
-        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15)
+        plot_market_cap_bars(prices_df, tickers_by_mcap, market_caps=market_caps, top_n=15)
 
         # Dual-subplot analysis for top 5 signals by predicted return
         top_signals = signals_df.head(5)
