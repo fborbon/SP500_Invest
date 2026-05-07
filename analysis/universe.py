@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
+import re
 import time
 
 import pandas as pd
@@ -44,6 +45,43 @@ def get_sp500_tickers(n=None) -> list:
         caps = dict(list(caps.items())[:n])
         
     return all_tickers, caps
+
+
+def fetch_company_metadata(tickers: list, market_caps: dict) -> pd.DataFrame:
+    """Fetch company name, sector, and founding year from Wikipedia S&P 500 table.
+
+    Combines with market_caps to add a market_cap_B column.
+    Returns a DataFrame indexed by ticker with columns:
+      company_name, sector, founded, market_cap_B
+    Missing tickers get NaN for metadata fields but keep their market cap.
+    """
+    try:
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        resp = requests.get(url, headers=_HEADERS, timeout=15)
+        resp.raise_for_status()
+        table = pd.read_html(StringIO(resp.text), attrs={'id': 'constituents'})[0]
+
+        meta = table[['Symbol', 'Security', 'GICS Sector', 'Founded']].copy()
+        meta.columns = ['ticker', 'company_name', 'sector', 'founded']
+        meta['ticker'] = meta['ticker'].str.strip()
+
+        # Extract 4-digit founding year from strings like "1976", "1885 (reincorporated 2000)"
+        meta['founded'] = meta['founded'].apply(
+            lambda v: int(m.group()) if (m := re.search(r'\d{4}', str(v))) else None
+        )
+        meta = meta.set_index('ticker')
+
+    except Exception as e:
+        print(f"  ✗ Could not fetch company metadata ({e}). Fields will be empty.")
+        meta = pd.DataFrame(index=tickers, columns=['company_name', 'sector', 'founded'])
+
+    # Add market cap in billions, for all tickers we have prices for
+    result = meta.reindex(tickers)
+    result['market_cap_B'] = [
+        round(market_caps.get(t, 0) / 1e9, 1) if market_caps.get(t, 0) else None
+        for t in tickers
+    ]
+    return result
 
 
 def fetch_market_caps(tickers: list) -> dict:

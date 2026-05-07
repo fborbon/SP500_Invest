@@ -5,7 +5,7 @@ from config import CORRELATION_DIR, GENERAL_DIR, MIN_R2, OUTPUTS_DIR
 from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
-from analysis.universe import get_sp500_tickers
+from analysis.universe import fetch_company_metadata, get_sp500_tickers
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
@@ -38,6 +38,18 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     inverse_pairs = get_top_inverse_pairs(corr_matrix, top_n=10)
 
     signals_df = generate_signals(prices_df, returns, corr_matrix)
+
+    # Enrich signals with company name, sector, founded year, market cap (B)
+    company_meta = fetch_company_metadata(list(prices_df.columns), market_caps)
+    signals_df = signals_df.merge(
+        company_meta.reset_index().rename(columns={'index': 'ticker'}),
+        on='ticker', how='left'
+    )
+    # Reorder columns so metadata appears right after ticker
+    meta_cols = ['company_name', 'sector', 'founded', 'market_cap_B']
+    other_cols = [c for c in signals_df.columns if c not in ['ticker'] + meta_cols]
+    signals_df = signals_df[['ticker'] + meta_cols + other_cols]
+
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df)
 
