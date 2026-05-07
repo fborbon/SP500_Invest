@@ -9,9 +9,11 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Outputs — keep folder, ignore generated files
+# Outputs — keep folders, ignore generated files
 outputs/*.png
 outputs/*.csv
+outputs/**/*.png
+outputs/**/*.csv
 
 # Environment / secrets
 .env
