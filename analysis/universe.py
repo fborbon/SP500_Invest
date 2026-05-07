@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
+import time
 
 import pandas as pd
 import requests
@@ -61,13 +62,19 @@ def fetch_market_caps(tickers: list) -> dict:
 
 def _fetch_caps_parallel(tickers: list) -> dict:
     def _get_cap(ticker):
-        try:
-            cap = yf.Ticker(ticker.replace('.', '-')).fast_info['market_cap']
-            return ticker, cap if cap else 0
-        except Exception:
-            return ticker, 0
+        yf_ticker = ticker.replace('.', '-')
+        for attempt in range(3):   # retry up to 3 times on None/error
+            try:
+                cap = yf.Ticker(yf_ticker).fast_info['market_cap']
+                if cap:
+                    return ticker, cap
+            except Exception:
+                pass
+            time.sleep(0.5 * (attempt + 1))
+        return ticker, 0
 
-    with ThreadPoolExecutor(max_workers=30) as executor:
+    # 10 workers instead of 30 to avoid Yahoo Finance rate-limiting on first call
+    with ThreadPoolExecutor(max_workers=10) as executor:
         return dict(executor.map(_get_cap, tickers))
 
 
