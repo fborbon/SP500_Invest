@@ -103,11 +103,11 @@ V3/
 
 | Source | Order | Used when |
 |---|---|---|
-| slickcharts.com | By S&P 500 weight ≈ market cap ✓ | Primary (single request, fast) |
-| Wikipedia + yfinance sort | By actual market cap ✓ | slickcharts blocked |
-| `FALLBACK_TICKERS` | Hardcoded top-20 | All sources fail, or `n_tickers='FALLBACK_TICKERS'` |
+| Wikipedia + yfinance sort | By actual market cap ✓ | Always (when `n` is specified) |
+| Wikipedia only | Alphabetical | `n=None` (full universe) |
+| `FALLBACK_TICKERS` | Hardcoded top-20 | Wikipedia unavailable, or `n_tickers='FALLBACK_TICKERS'` |
 
-When `n` is specified and slickcharts is unavailable, the bot fetches all ~503 tickers from Wikipedia and sorts them by real market cap via yfinance (~30s extra). This guarantees the true top N companies are always selected. Plots additionally re-sort by actual market caps so `price_series.png` and `market_cap_bars.png` are always correct.
+When `n` is specified, all ~503 Wikipedia tickers are fetched then sorted by real yfinance market caps (~30s) before slicing to top N. Plots also re-sort by market cap so `price_series.png` and `market_cap_bars.png` always show the correct companies.
 
 `n_tickers` accepts three types:
 - **`int`** — top N companies by market cap (e.g. `50`)
