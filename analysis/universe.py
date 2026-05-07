@@ -27,20 +27,23 @@ def get_sp500_tickers(n=None) -> list:
     """
     if n == 'FALLBACK_TICKERS':
         print(f"  → Using FALLBACK_TICKERS ({len(FALLBACK_TICKERS)} hardcoded tickers)")
-        return list(FALLBACK_TICKERS)
-
-    all_tickers = _fetch_wikipedia()
+        all_tickers = list(FALLBACK_TICKERS)
+    else:
+        all_tickers = _fetch_wikipedia()
+        
+    print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance (this takes ~30s)...")
+    caps = fetch_market_caps(all_tickers)
+    caps = dict(sorted(caps.items(), key=lambda item: item[1], reverse=True))
+    all_tickers = sorted(all_tickers, key=lambda t: caps.get(t, 0), reverse=True)
 
     if n is None:
         print(f"  → Using all {len(all_tickers)} S&P 500 tickers")
-        return all_tickers
-
-    print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance"
-          f" to select top {n} (this takes ~30s)...")
-    caps        = _fetch_caps_parallel(all_tickers)
-    all_tickers = sorted(all_tickers, key=lambda t: caps.get(t, 0), reverse=True)
-    print(f"  → Selected top {n} of {len(all_tickers)} by market cap")
-    return all_tickers[:n]
+    elif isinstance(n, int):
+        print(f"  → Selected top {n} of {len(all_tickers)} by market cap")
+        all_tickers = all_tickers[:n]
+        caps = dict(list(caps.items())[:n])
+        
+    return all_tickers, caps
 
 
 def fetch_market_caps(tickers: list) -> dict:

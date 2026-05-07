@@ -5,7 +5,7 @@ from config import MIN_R2, OUTPUTS_DIR
 from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
-from analysis.universe import fetch_market_caps, get_sp500_tickers
+from analysis.universe import get_sp500_tickers
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
@@ -25,22 +25,12 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                         None = full universe (~503 tickers).
     """
     print("\nFetching S&P 500 universe...")
-    tickers = get_sp500_tickers(n=n_tickers)
+    tickers, market_caps = get_sp500_tickers(n=n_tickers)
 
     prices_df = fetch_prices_free(tickers)
     if prices_df.empty or len(prices_df.columns) < 5:
         print("✗ Insufficient data. Aborting.")
         return
-
-    market_caps = fetch_market_caps(list(prices_df.columns))
-
-    # Re-sort tickers by actual market cap so plots always show the correct top/bottom N
-    # regardless of which source (slickcharts / stockanalysis / Wikipedia) was used.
-    tickers_by_mcap = sorted(
-        prices_df.columns.tolist(),
-        key=lambda t: market_caps.get(t, 0),
-        reverse=True
-    )
 
     print("\nCalculating correlations...")
     corr_matrix, returns = compute_correlations(prices_df)
@@ -55,10 +45,10 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_correlation_matrix(corr_matrix)
 
         # All tickers in gray, top 15 most valuable in color
-        plot_price_series(prices_df, tickers_by_mcap, top_n=15)
+        plot_price_series(prices_df, tickers, top_n=15)
 
         # Top 15 vs bottom 15 — stock price (top) and market cap (bottom)
-        plot_market_cap_bars(prices_df, tickers_by_mcap, market_caps=market_caps, top_n=15)
+        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15)
 
         # Dual-subplot analysis for top 5 signals by predicted return
         top_signals = signals_df.head(5)

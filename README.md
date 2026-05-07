@@ -52,8 +52,8 @@ V3/
 │
 ├── analysis/
 │   ├── __init__.py
-│   ├── universe.py         # get_sp500_tickers(n); fetch_market_caps() via yfinance
-│   │                       # slickcharts.com primary; falls back to Wikipedia, then top-20
+│   ├── universe.py         # get_sp500_tickers(n) → (tickers, caps); fetch_market_caps()
+│   │                       # Wikipedia + yfinance sort; falls back to FALLBACK_TICKERS
 │   ├── correlations.py     # compute_correlations(), get_top_correlated_pairs(),
 │   │                       # get_top_inverse_pairs()
 │   ├── model.py            # predict_price() — RandomForestRegressor + TimeSeriesSplit;
