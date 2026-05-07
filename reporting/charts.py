@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from config import OUTPUTS_DIR
+from config import CORRELATION_DIR, GENERAL_DIR, OUTPUTS_DIR
 
 
 def plot_correlation_matrix(corr_matrix, save_path=None):
     """Save the correlation matrix as a heatmap PNG."""
     if save_path is None:
-        save_path = OUTPUTS_DIR / 'correlation_matrix.png'
+        save_path = CORRELATION_DIR / 'correlation_matrix.png'
 
     fig, ax = plt.subplots(figsize=(14, 12))
     n = len(corr_matrix)
@@ -32,25 +32,30 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
     print(f"  Correlation matrix saved to: {save_path}")
 
 
-def plot_price_series(prices_df, tickers_ordered, top_n=15, save_path=None):
+def plot_price_series(prices_df, tickers_ordered, top_n=15, label='market cap',
+                      save_path=None):
     """Two-subplot price time series for all tickers in prices_df.
 
     Top subplot    — normalized prices (base = 100).
     Bottom subplot — absolute close prices ($).
 
-    Top N most valuable companies (by market cap order) drawn in distinct
-    colors with labels; all others as thin light-gray lines without labels.
+    Top N tickers (ordered by tickers_ordered) drawn in distinct colors with
+    labels; all others as thin light-gray lines without labels.
     Both subplots share the same X axis and color coding.
+
+    Args:
+        label: describes how tickers_ordered is ranked (used in the plot title).
+               e.g. 'market cap' or 'stock price'.
     """
     if save_path is None:
-        save_path = OUTPUTS_DIR / 'price_series.png'
+        save_path = GENERAL_DIR / 'price_series_market-cap.png'
 
     top_tickers = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
     colors = plt.cm.tab20.colors
 
     fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
                                            gridspec_kw={'hspace': 0.06})
-    fig.suptitle(f'S&P 500 Price Series — Top {len(top_tickers)} by market cap highlighted',
+    fig.suptitle(f'S&P 500 Price Series — Top {len(top_tickers)} by {label} highlighted',
                  fontsize=13, fontweight='bold')
 
     def normalize(series):
@@ -103,7 +108,7 @@ def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
     Top N shown in green, bottom N in coral, with a gap between groups.
     """
     if save_path is None:
-        save_path = OUTPUTS_DIR / 'market_cap_bars.png'
+        save_path = GENERAL_DIR / 'market_cap_bars.png'
 
     available     = [t for t in tickers_ordered if t in prices_df.columns]
     top           = available[:top_n]
@@ -191,7 +196,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
               inverse correlators (r < 0) drawn as dashed lines.
     """
     if save_path is None:
-        save_path = OUTPUTS_DIR / f'analysis_{target}.png'
+        save_path = CORRELATION_DIR / f'analysis_{target}.png'
 
     fig, (ax_sc, ax_ts) = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle(f'{target} — Prediction Analysis (Random Forest)',

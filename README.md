@@ -69,12 +69,14 @@ V3/
 │                           # sections; save_signals_csv()
 │
 ├── outputs/                # Generated files (PNG, CSV) — git-ignored contents
-│   ├── correlation_matrix.png
-│   ├── price_series.png
-│   ├── market_cap_bars.png
+│   ├── General/
+│   │   ├── price_series_market-cap.png
+│   │   ├── price_series_stock-price.png
+│   │   └── market_cap_bars.png
+│   ├── Correlation_method/
+│   │   ├── correlation_matrix.png
+│   │   └── analysis_{TICKER}.png   # one per top-5 signal
 │   ├── signals.csv
-│   ├── analysis_{TICKER}.png   # one per top-5 signal
-│   ├── demo_correlation_matrix.png
 │   └── demo_signals.csv
 │
 ├── sp500_bot_function_diagram.png   # Architecture diagram
@@ -143,15 +145,21 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 
 ## Output Plots (`save_plots=True`)
 
-**`correlation_matrix.png`** — Pearson correlation heatmap for all analyzed tickers.
+**`Correlation_method/correlation_matrix.png`** — Pearson correlation heatmap for all analyzed tickers.
 
-**`price_series.png`** — Two-subplot price time series. Top 15 most valuable companies in distinct colors with labels; all others in light gray.
-- **Top subplot** — normalized prices (base = 100) for relative performance comparison.
-- **Bottom subplot** — absolute close prices ($) for the same tickers.
+**`Correlation_method/analysis_{TICKER}.png`** — generated for the top 5 signals by predicted return:
+- **Left** — scatter of actual vs predicted cumulative returns (1:1 aspect ratio) with R² trend line.
+- **Right** — normalized price time series of the target + its top 5 correlated tickers.
 
-**`market_cap_bars.png`** — Two-subplot bar chart for top 15 and bottom 15 companies (by market cap order), with a gap between groups. Top 15 in green, bottom 15 in coral.
+**`General/price_series_market-cap.png`** — Two-subplot price time series. Top 15 by market cap in distinct colors; all others in light gray.
+- **Top subplot** — normalized prices (base = 100).
+- **Bottom subplot** — absolute close prices ($).
+
+**`General/price_series_stock-price.png`** — Same layout but top 15 highlighted by highest last close stock price.
+
+**`General/market_cap_bars.png`** — Two-subplot bar chart for top 15 and bottom 15 companies by market cap.
 - **Top subplot** — last closing stock price ($).
-- **Bottom subplot** — market capitalization ($B / $T) fetched live from Yahoo Finance via `yfinance`.
+- **Bottom subplot** — market capitalization ($B / $T) from yfinance.
 
 **`analysis_{TICKER}.png`** — generated for the top 5 signals by predicted return:
 - **Left** — scatter of actual vs predicted cumulative returns (1:1 aspect ratio) with R² trend line.

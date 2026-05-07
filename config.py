@@ -1,8 +1,12 @@
 from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent
-OUTPUTS_DIR = BASE_DIR / 'outputs'
+OUTPUTS_DIR      = BASE_DIR / 'outputs'
+GENERAL_DIR      = OUTPUTS_DIR / 'General'
+CORRELATION_DIR  = OUTPUTS_DIR / 'Correlation_method'
 OUTPUTS_DIR.mkdir(exist_ok=True)
+GENERAL_DIR.mkdir(exist_ok=True)
+CORRELATION_DIR.mkdir(exist_ok=True)
 
 # Interactive Brokers connection
 IB_HOST   = '127.0.0.1'

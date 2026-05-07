@@ -3,7 +3,7 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from config import HISTORY_DAYS, OUTPUTS_DIR
+from config import CORRELATION_DIR, HISTORY_DAYS, OUTPUTS_DIR
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.signals import generate_signals
 from reporting.charts import plot_correlation_matrix
@@ -61,5 +61,5 @@ def run_demo():
 
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, OUTPUTS_DIR / 'demo_signals.csv')
-    plot_correlation_matrix(corr_matrix, OUTPUTS_DIR / 'demo_correlation_matrix.png')
+    plot_correlation_matrix(corr_matrix, CORRELATION_DIR / 'demo_correlation_matrix.png')
     print(f"\n✓ Demo complete. Check the outputs/ folder.")

@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings('ignore')
 
-from config import MIN_R2, OUTPUTS_DIR
+from config import CORRELATION_DIR, GENERAL_DIR, MIN_R2, OUTPUTS_DIR
 from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
@@ -44,13 +44,25 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     if save_plots:
         plot_correlation_matrix(corr_matrix)
 
-        # All tickers in gray, top 15 most valuable in color
-        plot_price_series(prices_df, tickers, top_n=15)
+        # General/ — price series highlighted by market cap
+        plot_price_series(prices_df, tickers, top_n=15, label='market cap',
+                          save_path=GENERAL_DIR / 'price_series_market-cap.png')
 
-        # Top 15 vs bottom 15 — stock price (top) and market cap (bottom)
-        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15)
+        # General/ — price series highlighted by highest stock price
+        tickers_by_price = sorted(
+            prices_df.columns.tolist(),
+            key=lambda t: prices_df[t].iloc[-1],
+            reverse=True
+        )
+        plot_price_series(prices_df, tickers_by_price, top_n=15, label='stock price',
+                          save_path=GENERAL_DIR / 'price_series_stock-price.png')
 
-        # Dual-subplot analysis for top 5 signals by predicted return
+        # General/ — bar chart: top 15 vs bottom 15 by market cap
+        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15,
+                             save_path=GENERAL_DIR / 'market_cap_bars.png')
+
+        # Correlation_method/ — correlation heatmap is saved by default
+        # Correlation_method/ — per-ticker prediction analysis
         top_signals = signals_df.head(5)
         if not top_signals.empty:
             print("\nGenerating analysis charts...")
@@ -63,7 +75,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                 plot_prediction_analysis(
                     ticker, returns, prices_df, top5, corr_signs,
                     y_actual, y_pred,
-                    save_path=OUTPUTS_DIR / f'analysis_{ticker}.png'
+                    save_path=CORRELATION_DIR / f'analysis_{ticker}.png'
                 )
 
     if execute_trades:
