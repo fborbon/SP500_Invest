@@ -1,12 +1,32 @@
+import datetime
 from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent
-OUTPUTS_DIR      = BASE_DIR / 'outputs'
-GENERAL_DIR      = OUTPUTS_DIR / 'General'
-CORRELATION_DIR  = OUTPUTS_DIR / 'Correlation_method'
+OUTPUTS_DIR = BASE_DIR / 'outputs'
 OUTPUTS_DIR.mkdir(exist_ok=True)
+
+# Static dirs kept for demo mode and chart defaults
+GENERAL_DIR     = OUTPUTS_DIR / 'General'
+CORRELATION_DIR = OUTPUTS_DIR / 'Correlation_method'
 GENERAL_DIR.mkdir(exist_ok=True)
 CORRELATION_DIR.mkdir(exist_ok=True)
+
+
+def create_run_dirs() -> tuple:
+    """Create a timestamped output folder tree for a single bot run.
+
+    Returns (run_dir, general_dir, correlation_dir).
+    Folder name format: 'YYYY-MM-DD_HH-MM'
+    """
+    ts      = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
+    run_dir = OUTPUTS_DIR / ts
+    gen_dir  = run_dir / 'General'
+    corr_dir = run_dir / 'Correlation_method'
+    run_dir.mkdir(exist_ok=True)
+    gen_dir.mkdir(exist_ok=True)
+    corr_dir.mkdir(exist_ok=True)
+    print(f"  Run outputs → {run_dir}")
+    return run_dir, gen_dir, corr_dir
 
 # Interactive Brokers connection
 IB_HOST   = '127.0.0.1'

@@ -68,17 +68,18 @@ V3/
 │   └── report.py           # print_report() — direct (↑↑) and inverse (↑↓) pair
 │                           # sections; save_signals_csv()
 │
-├── outputs/                # Generated files (PNG, CSV) — git-ignored contents
-│   ├── General/
-│   │   ├── price_series_market-cap.png
-│   │   ├── price_series_stock-price-absolute.png
-│   │   ├── price_series_normalized-return.png
-│   │   └── market_cap_bars.png
-│   ├── Correlation_method/
-│   │   ├── correlation_matrix.png
-│   │   └── analysis_{TICKER}.png   # one per top-5 signal
-│   ├── signals.csv
-│   └── demo_signals.csv
+├── outputs/                # Generated files — git-ignored contents
+│   ├── 2026-05-07_14-30/   # timestamped folder per run (YYYY-MM-DD_HH-MM)
+│   │   ├── signals.csv
+│   │   ├── General/
+│   │   │   ├── price_series_market-cap.png
+│   │   │   ├── price_series_stock-price-absolute.png
+│   │   │   ├── price_series_normalized-return.png
+│   │   │   └── market_cap_bars.png
+│   │   └── Correlation_method/
+│   │       ├── correlation_matrix.png
+│   │       └── analysis_{TICKER}.png
+│   └── demo_signals.csv    # demo mode outputs (no timestamp)
 │
 ├── sp500_bot_function_diagram.png   # Architecture diagram
 └── Main.ipynb                       # Jupyter entry point

@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings('ignore')
 
-from config import CORRELATION_DIR, GENERAL_DIR, MIN_R2, OUTPUTS_DIR
+from config import MIN_R2, OUTPUTS_DIR, create_run_dirs
 from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
@@ -24,6 +24,8 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         n_tickers:      Number of top S&P 500 companies by market cap to use.
                         None = full universe (~503 tickers).
     """
+    run_dir, gen_dir, corr_dir = create_run_dirs()
+
     print("\nFetching S&P 500 universe...")
     tickers, market_caps = get_sp500_tickers(n=n_tickers)
 
@@ -51,14 +53,15 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     signals_df = signals_df[['ticker'] + meta_cols + other_cols]
 
     print_report(signals_df, top_pairs, inverse_pairs)
-    save_signals_csv(signals_df)
+    save_signals_csv(signals_df, run_dir / 'signals.csv')
 
     if save_plots:
-        plot_correlation_matrix(corr_matrix)
+        plot_correlation_matrix(corr_matrix,
+                                save_path=corr_dir / 'correlation_matrix.png')
 
         # General/ — price series highlighted by market cap
         plot_price_series(prices_df, tickers, top_n=15, label='market cap',
-                          save_path=GENERAL_DIR / 'price_series_market-cap.png')
+                          save_path=gen_dir / 'price_series_market-cap.png')
 
         # General/ — price series highlighted by highest absolute stock price
         tickers_by_price = sorted(
@@ -67,7 +70,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             reverse=True
         )
         plot_price_series(prices_df, tickers_by_price, top_n=15, label='stock price',
-                          save_path=GENERAL_DIR / 'price_series_stock-price-absolute.png')
+                          save_path=gen_dir / 'price_series_stock-price-absolute.png')
 
         # General/ — price series highlighted by highest normalized return (best performers)
         tickers_by_norm = sorted(
@@ -76,15 +79,15 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             reverse=True
         )
         plot_price_series(prices_df, tickers_by_norm, top_n=15, label='normalized return',
-                          save_path=GENERAL_DIR / 'price_series_normalized-return.png')
+                          save_path=gen_dir / 'price_series_normalized-return.png')
 
         # General/ — bar chart: top 15 vs bottom 15 by market cap
         plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15,
-                             save_path=GENERAL_DIR / 'market_cap_bars.png')
+                             save_path=gen_dir / 'market_cap_bars.png')
 
-        # Correlation_method/ — correlation heatmap is saved by default
         # Correlation_method/ — per-ticker prediction analysis
-        top_signals = signals_df.head(5)
+        top_signals_n = 15
+        top_signals = signals_df.head(top_signals_n)
         if not top_signals.empty:
             print("\nGenerating analysis charts...")
         for _, row in top_signals.iterrows():
@@ -96,7 +99,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                 plot_prediction_analysis(
                     ticker, returns, prices_df, top5, corr_signs,
                     y_actual, y_pred,
-                    save_path=CORRELATION_DIR / f'analysis_{ticker}.png'
+                    save_path=corr_dir / f'analysis_{ticker}.png'
                 )
 
     if execute_trades:
