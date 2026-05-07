@@ -36,8 +36,8 @@ def get_sp500_tickers(n=None) -> list:
 
     print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance"
           f" to select top {n} (this takes ~30s)...")
-    caps = _fetch_caps_parallel(all_tickers)
-    all_tickers.sort(key=lambda t: caps.get(t, 0), reverse=True)
+    caps        = _fetch_caps_parallel(all_tickers)
+    all_tickers = sorted(all_tickers, key=lambda t: caps.get(t, 0), reverse=True)
     print(f"  → Selected top {n} of {len(all_tickers)} by market cap")
     return all_tickers[:n]
 
