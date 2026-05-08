@@ -676,7 +676,7 @@ with tab_corr:
 
             if selected_t:
                 _echarts_dual_chart(
-                    prices_c, selected_t, nm_c,
+                    prices_c[selected_t], selected_t, nm_c,
                     norm_fn=lambda s: s / s.iloc[0] * 100,
                     abs_fn=lambda s: s,
                     title='Price Series — Selected Companies',
