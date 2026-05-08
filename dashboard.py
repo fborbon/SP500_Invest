@@ -2,6 +2,7 @@
 SP500 Correlation Bot — Dashboard
 Run with:  streamlit run dashboard.py --server.headless true
 """
+import base64
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -38,24 +39,33 @@ corr_dir = run_dir / 'Correlation_method'
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 520,
-                        link_cols: dict = None):
+                        link_cols: dict = None, cell_hrefs: dict = None):
     """Render a DataFrame as HTML with a synchronised scrollbar on top AND bottom.
 
-    link_cols: maps column name → URL template with {value} placeholder.
-               e.g. {'ticker': 'https://finance.yahoo.com/quote/{value}'}
+    link_cols:  maps column name → URL template with {value} placeholder (all rows).
+                e.g. {'ticker': 'https://finance.yahoo.com/quote/{value}'}
+    cell_hrefs: maps (col_name, row_idx) → href for individual cell links.
+                e.g. {('signal', 3): 'data:image/png;base64,...'}
     """
     rows_html = []
     for idx, row in df.iterrows():
         style = row_styles.get(idx, '') if row_styles else ''
         cells = []
         for col, v in zip(df.columns, row):
-            if link_cols and col in link_cols:
+            td = 'padding:4px 10px;border:1px solid #eee;white-space:nowrap;'
+            if cell_hrefs and (col, idx) in cell_hrefs:
+                href = cell_hrefs[(col, idx)]
+                cell = (f'<td style="{td}">'
+                        f'<a href="{href}" target="_blank" '
+                        f'style="color:inherit;text-decoration:underline;font-weight:bold;">'
+                        f'{v}</a></td>')
+            elif link_cols and col in link_cols:
                 url = link_cols[col].format(value=v)
-                cell = (f'<td style="padding:4px 10px;border:1px solid #eee;white-space:nowrap;">'
+                cell = (f'<td style="{td}">'
                         f'<a href="{url}" target="_blank" '
                         f'style="color:inherit;text-decoration:underline;">{v}</a></td>')
             else:
-                cell = f'<td style="padding:4px 10px;border:1px solid #eee;white-space:nowrap;">{v}</td>'
+                cell = f'<td style="{td}">{v}</td>'
             cells.append(cell)
         rows_html.append(f'<tr style="{style}">{"".join(cells)}</tr>')
 
@@ -121,23 +131,6 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
     components.html(full_html, height=height + 30, scrolling=False)
 
 
-def _show_analysis_charts(tickers_df: pd.DataFrame, name_map: dict):
-    """Show expanders with analysis PNG for each ticker in tickers_df."""
-    if not corr_dir.exists():
-        return
-    for _, row in tickers_df.iterrows():
-        ticker  = row['ticker']
-        plot    = corr_dir / f'analysis_{ticker}.png'
-        if not plot.exists():
-            continue
-        company = name_map.get(ticker, ticker)
-        signal  = row.get('signal', '')
-        icon    = '🟢' if signal == 'BUY' else '🔴' if signal == 'SELL' else '📈'
-        ret_str = (f"  ret={row['predicted_return']:+.1f}%"
-                   if pd.notna(row.get('predicted_return')) else '')
-        with st.expander(f"{icon} {ticker} — {company}{ret_str}"):
-            st.image(str(plot), use_container_width=True)
-
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_signals, tab_fund, tab_prices, tab_corr = st.tabs([
@@ -191,32 +184,24 @@ with tab_signals:
             elif sig:
                 row_styles[i] = sig
 
-        _dual_scroll_table(df.reset_index(drop=True), row_styles, height=500,
-                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'})
+        # Build per-cell chart links for the signal column
+        df_reset = df.reset_index(drop=True)
+        cell_hrefs = {}
+        if corr_dir.exists():
+            for i, row in df_reset.iterrows():
+                plot = corr_dir / f'analysis_{row["ticker"]}.png'
+                if plot.exists():
+                    b64 = base64.b64encode(plot.read_bytes()).decode()
+                    cell_hrefs[('signal', i)] = f'data:image/png;base64,{b64}'
+
+        _dual_scroll_table(df_reset, row_styles, height=500,
+                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'},
+                           cell_hrefs=cell_hrefs)
         st.caption(
             f'🔵 Top {TOP_N_HIGHLIGHT} highest predicted return  '
-            '🟢 BUY  🔴 SELL  🟡 HOLD'
+            '🟢 BUY  🔴 SELL  🟡 HOLD  '
+            '(underlined signal = click to view prediction chart)'
         )
-        st.divider()
-
-        # Analysis chart expanders for BUY/SELL + top return tickers
-        special_df = (
-            pd.concat([
-                df[df['signal'].isin(['BUY', 'SELL'])],
-                df[df['ticker'].isin(top_return_tickers)],
-            ])
-            .drop_duplicates(subset=['ticker'])
-            .sort_values('predicted_return', ascending=False, na_position='last')
-        )
-
-        if not special_df.empty and corr_dir.exists():
-            available = [t for t in special_df['ticker']
-                         if (corr_dir / f'analysis_{t}.png').exists()]
-            if available:
-                st.subheader(f'📊 Prediction Analysis Charts ({len(available)} tickers)')
-                _show_analysis_charts(
-                    special_df[special_df['ticker'].isin(available)], name_map
-                )
 
 
 # ── Tab 2: Fundamentals ───────────────────────────────────────────────────────
