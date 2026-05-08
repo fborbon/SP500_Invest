@@ -139,20 +139,17 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 
 
 def _show_with_yrescale(fig, height: int = 920):
-    """Render a Plotly figure with y-axis auto-rescaling when x range changes.
-
-    Embeds matching Plotly.js via include_plotlyjs=True, then injects a
-    plotly_relayout listener. Reads x range directly from event data (ed) so
-    it works whether the range slider fires on xaxis or xaxis2.
-    """
+    """Render a Plotly figure with y-axis auto-rescaling when x range changes."""
+    # Legend inside chart (top-left, horizontal) — avoids clipping in iframe
     fig.update_layout(
-        legend=dict(orientation='v', yanchor='top', y=1, xanchor='left', x=1.01,
-                    font=dict(size=10)),
-        margin=dict(t=50, r=220, b=10, l=60),   # 220px right margin for legend
+        legend=dict(orientation='h', yanchor='top', y=0.99, xanchor='left', x=0,
+                    bgcolor='rgba(255,255,255,0.6)', font=dict(size=9)),
+        margin=dict(t=50, r=20, b=10, l=60),
         height=height,
     )
 
     base_html = fig.to_html(include_plotlyjs=True, full_html=True,
+                            div_id='plotly-chart',
                             default_height=f'{height}px', default_width='100%')
 
     rescale_js = """<script>
@@ -165,8 +162,6 @@ def _show_with_yrescale(fig, height: int = 920):
     var busy=false;
     gd.on('plotly_relayout',function(ed){
       if(busy) return;
-      // Read x range directly from event data first, then fall back to layout.
-      // Range slider fires xaxis2.range[0]; selector fires xaxis.range[0].
       var xlo_raw, xhi_raw;
       if('xaxis.range[0]' in ed){
         xlo_raw=ed['xaxis.range[0]']; xhi_raw=ed['xaxis.range[1]'];
@@ -195,11 +190,13 @@ def _show_with_yrescale(fig, height: int = 920):
       if(Object.keys(upd).length){busy=true;Plotly.relayout(gd,upd).then(function(){busy=false;});}
     });
   }
-  function tryAttach(){
-    var plots=document.querySelectorAll('.js-plotly-plot');
-    if(plots.length){attach(plots[0]);}else{setTimeout(tryAttach,300);}
+  var gd=document.getElementById('plotly-chart');
+  if(gd){
+    // Attach after first render completes
+    gd.on('plotly_afterplot', function(){ attach(gd); });
+    // Fallback: also try immediately in case afterplot already fired
+    if(gd._fullData && gd._fullData.length) attach(gd);
   }
-  tryAttach();
 })();
 </script>"""
 
