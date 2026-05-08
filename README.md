@@ -115,6 +115,7 @@ V3/
 | `BUY_THRESHOLD` | `0.01` | Predicted return > 1% → BUY |
 | `SELL_THRESHOLD` | `-0.10` | Predicted return < −10% → SELL |
 | `MAX_POSITION_PCT` | `0.10` | Max 10% of portfolio per position |
+| `TOP_N_HIGHLIGHT` | `15` | Companies highlighted in price series and bar charts |
 | `FALLBACK_PORTFOLIO` | `1000.0` | Portfolio value used when IB does not return NetLiquidation |
 | `FALLBACK_TICKERS` | top 20 | Used when all online sources fail |
 

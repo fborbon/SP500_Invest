@@ -35,6 +35,9 @@ FALLBACK_TICKERS = [
     'PG',   'HD',   'AVGO', 'COST', 'NFLX'
 ]
 
+# Number of top companies highlighted in price series and bar charts
+TOP_N_HIGHLIGHT  = 15
+
 # Model parameters
 HISTORY_DAYS     = 800     # Days of history for correlation calculation
 PREDICTION_DAYS  = 7       # Prediction horizon (days)

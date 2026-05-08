@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings('ignore')
 
-from config import MIN_R2, OUTPUTS_DIR, create_run_dirs
+from config import MIN_R2, OUTPUTS_DIR, TOP_N_HIGHLIGHT, create_run_dirs
 from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
@@ -66,7 +66,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                                 save_path=corr_dir / 'correlation_matrix.png')
 
         # General/ — price series highlighted by market cap
-        plot_price_series(prices_df, tickers, top_n=15, label='market cap',
+        plot_price_series(prices_df, tickers, top_n=TOP_N_HIGHLIGHT, label='market cap',
                           save_path=gen_dir / 'price_series_market-cap.png')
 
         # General/ — price series highlighted by highest absolute stock price
@@ -75,7 +75,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             key=lambda t: prices_df[t].iloc[-1],
             reverse=True
         )
-        plot_price_series(prices_df, tickers_by_price, top_n=15, label='stock price',
+        plot_price_series(prices_df, tickers_by_price, top_n=TOP_N_HIGHLIGHT, label='stock price',
                           save_path=gen_dir / 'price_series_stock-price-absolute.png')
 
         # General/ — price series highlighted by highest normalized return (best performers)
@@ -84,11 +84,11 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
             key=lambda t: prices_df[t].iloc[-1] / prices_df[t].iloc[0],
             reverse=True
         )
-        plot_price_series(prices_df, tickers_by_norm, top_n=15, label='normalized return',
+        plot_price_series(prices_df, tickers_by_norm, top_n=TOP_N_HIGHLIGHT, label='normalized return',
                           save_path=gen_dir / 'price_series_normalized-return.png')
 
         # General/ — bar chart: top 15 vs bottom 15 by market cap
-        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=15,
+        plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=TOP_N_HIGHLIGHT,
                              save_path=gen_dir / 'market_cap_bars.png')
 
         # Correlation_method/ — per-ticker prediction analysis

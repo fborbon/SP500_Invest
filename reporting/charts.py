@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from config import OUTPUTS_DIR
+from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
 
 def plot_correlation_matrix(corr_matrix, save_path=None):
@@ -32,7 +32,7 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
     print(f"  Correlation matrix saved to: {save_path}")
 
 
-def plot_price_series(prices_df, tickers_ordered, top_n=15, label='market cap',
+def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='market cap',
                       save_path=None):
     """Two-subplot price time series for all tickers in prices_df.
 
@@ -97,7 +97,7 @@ def plot_price_series(prices_df, tickers_ordered, top_n=15, label='market cap',
 
 
 def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
-                         top_n=15, save_path=None):
+                         top_n=TOP_N_HIGHLIGHT, save_path=None):
     """Two-subplot bar chart for top N and bottom N companies (by market cap order).
 
     Top subplot    — last closing stock price ($).
