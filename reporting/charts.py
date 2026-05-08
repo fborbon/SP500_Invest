@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
@@ -184,6 +185,83 @@ def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
     print(f"  Market cap bars saved to: {save_path}")
+
+
+def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
+                           save_path_abs=None, save_path_norm=None):
+    """Two PNG files — market cap time series (approximated as price × shares).
+
+    Chart 1 (save_path_abs):  top N highlighted by current (absolute) market cap.
+    Chart 2 (save_path_norm): top N highlighted by normalised cap growth (latest/earliest).
+
+    Each chart has two subplots: normalised cap on top, absolute ($B) on bottom.
+    """
+    if save_path_abs is None:
+        save_path_abs  = OUTPUTS_DIR / 'market_cap_series_absolute.png'
+    if save_path_norm is None:
+        save_path_norm = OUTPUTS_DIR / 'market_cap_series_normalized.png'
+
+    # Build approximate historical market cap (price × implied shares)
+    mcap_series = {}
+    for t in prices_df.columns:
+        cap_usd = market_caps.get(t, 0)
+        price   = prices_df[t].iloc[-1]
+        if cap_usd > 0 and price > 0:
+            shares = cap_usd / price
+            mcap_series[t] = prices_df[t] * shares / 1e9   # $B
+
+    if not mcap_series:
+        print("  ✗ No market cap data available for time series.")
+        return
+
+    mcap_df = pd.DataFrame(mcap_series)
+    colors  = plt.cm.tab20.colors
+
+    # Orderings
+    by_abs  = sorted(mcap_series, key=lambda t: market_caps.get(t, 0), reverse=True)
+    by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()
+
+    def _plot(ordered, save_path, label):
+        top_t = ordered[:top_n]
+
+        fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
+                                               gridspec_kw={'hspace': 0.06})
+        fig.suptitle(f'S&P 500 Market Cap Time Series — Top {len(top_t)} by {label} highlighted',
+                     fontsize=13, fontweight='bold')
+
+        def normalize(series):
+            return series / series.iloc[0] * 100
+
+        for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
+            for t in mcap_df.columns:
+                if t not in top_t:
+                    data = normalize(mcap_df[t]) if use_norm else mcap_df[t]
+                    ax.plot(mcap_df.index, data, color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+            for idx, t in enumerate(top_t):
+                data = normalize(mcap_df[t]) if use_norm else mcap_df[t]
+                ax.plot(mcap_df.index, data, color=colors[idx % 20], linewidth=1.6, alpha=0.9,
+                        label=t, zorder=2)
+            ax.grid(True, alpha=0.2)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+        ax_norm.set_ylabel('Normalized market cap (base = 100)')
+        ax_norm.set_title('Normalized market cap')
+        ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+
+        ax_abs.set_ylabel('Market cap ($B)')
+        ax_abs.set_title('Absolute market cap')
+        ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+        ax_abs.set_xlabel('Date')
+        ax_abs.tick_params(axis='x', rotation=30)
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"  Market cap series saved to: {save_path}")
+
+    _plot(by_abs,  save_path_abs,  'current market cap')
+    _plot(by_norm, save_path_norm, 'normalized cap growth')
 
 
 def plot_prediction_analysis(target: str, returns, prices_df,

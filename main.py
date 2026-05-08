@@ -11,7 +11,8 @@ from analysis.correlations import compute_correlations, get_top_correlated_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
 from reporting.charts import (plot_correlation_matrix, plot_market_cap_bars,
-                               plot_prediction_analysis, plot_price_series)
+                               plot_market_cap_series, plot_prediction_analysis,
+                               plot_price_series)
 from reporting.report import print_report, save_signals_csv
 
 
@@ -102,6 +103,11 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         print("\nGeneral/ — bar chart: top 15 vs bottom 15 by market cap")
         plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=TOP_N_HIGHLIGHT,
                              save_path=gen_dir / 'market_cap_bars.png')
+
+        print("\nGeneral/ — market cap time series (absolute + normalized growth)")
+        plot_market_cap_series(prices_df, market_caps, top_n=TOP_N_HIGHLIGHT,
+                               save_path_abs=gen_dir  / 'market_cap_series_absolute.png',
+                               save_path_norm=gen_dir / 'market_cap_series_normalized.png')
 
         print("\nGenerate tables for: top N by predicted return  +  all BUY/SELL tickers")
         # Correlation_method/ — per-ticker prediction analysis
