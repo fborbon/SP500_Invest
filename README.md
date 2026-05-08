@@ -56,6 +56,8 @@ V3/
 │   │                       # fetch_company_metadata() — name, sector, founded, cap ($B)
 │   ├── correlations.py     # compute_correlations(), get_top_correlated_pairs(),
 │   │                       # get_top_inverse_pairs()
+│   ├── fundamentals.py     # fetch_fundamentals(), score_fundamentals(),
+│   │                       # save_fundamentals_csv() — 10-metric scoring → likelihood_pct
 │   ├── model.py            # predict_price() — RandomForestRegressor + TimeSeriesSplit;
 │   │                       # returns corr_signs, y_actual, y_predicted
 │   └── signals.py          # generate_signals() — BUY/SELL/HOLD with
@@ -71,6 +73,7 @@ V3/
 ├── outputs/                # Generated files — git-ignored contents
 │   ├── 2026-05-07_14-30/   # timestamped folder per run (YYYY-MM-DD_HH-MM)
 │   │   ├── signals.csv
+│   │   ├── fundamentals.csv
 │   │   ├── General/
 │   │   │   ├── price_series_market-cap.png
 │   │   │   ├── price_series_stock-price-absolute.png

@@ -6,6 +6,7 @@ from broker.connection import connect_ib
 from broker.data import fetch_prices, fetch_prices_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
 from analysis.universe import fetch_company_metadata, get_sp500_tickers
+from analysis.fundamentals import fetch_fundamentals, score_fundamentals, save_fundamentals_csv
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
@@ -54,6 +55,11 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
 
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, run_dir / 'signals.csv')
+
+    # Fundamental analysis table
+    fund_raw = fetch_fundamentals(list(prices_df.columns))
+    fund_df  = score_fundamentals(fund_raw)
+    save_fundamentals_csv(fund_df, run_dir / 'fundamentals.csv')
 
     if save_plots:
         plot_correlation_matrix(corr_matrix,
