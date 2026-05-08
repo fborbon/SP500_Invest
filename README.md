@@ -87,6 +87,7 @@ V3/
 ├── outputs/                # Generated files — git-ignored contents
 │   ├── 2026-05-07_14-30/   # timestamped folder per run (YYYY-MM-DD_HH-MM)
 │   │   ├── signals.csv
+│   │   ├── prices.csv          # raw close prices — used by dashboard for interactive charts
 │   │   ├── fundamentals.csv
 │   │   ├── General/
 │   │   │   ├── price_series_market-cap.png

@@ -179,22 +179,88 @@ with tab_prices:
             st.plotly_chart(fig, use_container_width=True)
             st.divider()
 
-    # ── Static price series PNGs ──────────────────────────────────────────────
-    if not gen_dir.exists():
-        st.info('No General/ plots found for this run.')
-    else:
-        plots = sorted(p for p in gen_dir.glob('*.png') if 'price_series' in p.name)
-        if not plots:
-            st.info('No price series plots found for this run.')
-        for plot in plots:
-            title = (plot.stem
-                     .replace('price_series_', 'Price Series — ')
-                     .replace('-', ' ')
-                     .replace('_', ' ')
-                     .title())
+    # ── Interactive price series charts (Plotly) ──────────────────────────────
+    prices_path = run_dir / 'prices.csv'
+    if prices_path.exists() and signals_path.exists():
+        prices_df = pd.read_csv(prices_path, index_col=0, parse_dates=True)
+        sdf_full  = pd.read_csv(signals_path)
+        name_map  = dict(zip(sdf_full['ticker'], sdf_full.get('company_name', sdf_full['ticker'])))
+
+        def _make_series_chart(ordered_tickers, title, normalize=False):
+            top_t  = [t for t in ordered_tickers if t in prices_df.columns][:TOP_N_HIGHLIGHT]
+            colors = [
+                '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+                '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5',
+            ]
+
+            fig = go.Figure()
+
+            # Single combined gray trace for all non-top tickers (fast)
+            x_bg, y_bg = [], []
+            for t in prices_df.columns:
+                if t not in top_t:
+                    vals = prices_df[t] / prices_df[t].iloc[0] * 100 if normalize else prices_df[t]
+                    x_bg.extend(list(prices_df.index) + [None])
+                    y_bg.extend(list(vals) + [None])
+            if x_bg:
+                fig.add_trace(go.Scatter(
+                    x=x_bg, y=y_bg, mode='lines',
+                    line=dict(color='lightgray', width=0.5),
+                    showlegend=False, hoverinfo='skip',
+                    name='Other',
+                ))
+
+            # Colored top tickers with hover
+            for i, t in enumerate(top_t):
+                company = name_map.get(t, t)
+                vals = prices_df[t] / prices_df[t].iloc[0] * 100 if normalize else prices_df[t]
+                y_label = 'Norm. price' if normalize else 'Price ($)'
+                fig.add_trace(go.Scatter(
+                    x=prices_df.index, y=vals,
+                    mode='lines', name=f'{t}',
+                    line=dict(color=colors[i % len(colors)], width=1.8),
+                    hovertemplate=(
+                        f'<b>{company}</b> ({t})<br>'
+                        f'%{{x|%Y-%m-%d}}<br>'
+                        f'{y_label}: %{{y:,.2f}}'
+                        '<extra></extra>'
+                    ),
+                ))
+
+            fig.update_layout(
+                title=title, height=480,
+                xaxis_title='Date',
+                yaxis_title='Normalized price (base=100)' if normalize else 'Close price ($)',
+                hovermode='x unified',
+                legend=dict(orientation='h', yanchor='bottom', y=1.02,
+                            xanchor='right', x=1),
+            )
+            return fig
+
+        # Sort orderings
+        mcap_col = 'market_cap_B' if 'market_cap_B' in sdf_full.columns else None
+        by_mcap  = (sdf_full.dropna(subset=[mcap_col])
+                             .sort_values(mcap_col, ascending=False)['ticker'].tolist()
+                    if mcap_col else list(prices_df.columns))
+
+        by_price = prices_df.iloc[-1].sort_values(ascending=False).index.tolist()
+
+        by_norm  = (prices_df.iloc[-1] / prices_df.iloc[0]) \
+                             .sort_values(ascending=False).index.tolist()
+
+        series = [
+            (by_mcap,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap',        False),
+            (by_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price',        False),
+            (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return',  True),
+        ]
+        for ordering, title, norm in series:
             st.subheader(title)
-            st.image(str(plot), use_container_width=True)
+            st.plotly_chart(_make_series_chart(ordering, title, norm),
+                            use_container_width=True)
             st.divider()
+    else:
+        st.info('prices.csv not found — re-run the bot to enable interactive charts.')
 
 
 # ── Tab 4: Correlation Analysis ───────────────────────────────────────────────

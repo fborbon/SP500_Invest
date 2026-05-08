@@ -56,6 +56,9 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, run_dir / 'signals.csv')
 
+    # Save prices for the dashboard interactive charts
+    prices_df.to_csv(run_dir / 'prices.csv')
+
     # Fundamental analysis table
     fund_raw = fetch_fundamentals(list(prices_df.columns))
     fund_df  = score_fundamentals(fund_raw)
