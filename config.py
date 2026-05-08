@@ -27,6 +27,12 @@ IB_PORT   = 7497           # 7497 = paper trading | 7496 = live
 CLIENT_ID = 1
 ACCOUNT   = ''             # Empty → use default account
 
+# Number of tickers to use in paper/signals/live runs.
+# int              → top N companies by market cap (e.g. 50)
+# None             → full S&P 500 (~503 tickers)
+# 'FALLBACK_TICKERS' → hardcoded top-20 list, no web request
+N_TICKERS = None
+
 # Used as fallback when Wikipedia is unreachable, and for demo mode
 FALLBACK_TICKERS = [
     'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOG',

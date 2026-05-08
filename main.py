@@ -174,7 +174,7 @@ if __name__ == '__main__':
     _n_arg = sys.argv[2] if len(sys.argv) > 2 else None
     n      = (_n_arg if _n_arg == 'FALLBACK_TICKERS'
                else int(_n_arg) if _n_arg is not None
-               else None)
+               else config.N_TICKERS)
 
     if mode == 'demo':
         run_demo()
