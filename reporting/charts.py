@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from config import CORRELATION_DIR, GENERAL_DIR, OUTPUTS_DIR
+from config import OUTPUTS_DIR
 
 
 def plot_correlation_matrix(corr_matrix, save_path=None):
     """Save the correlation matrix as a heatmap PNG."""
     if save_path is None:
-        save_path = CORRELATION_DIR / 'correlation_matrix.png'
+        save_path = OUTPUTS_DIR / 'correlation_matrix.png'
 
     fig, ax = plt.subplots(figsize=(14, 12))
     n = len(corr_matrix)
@@ -48,7 +48,7 @@ def plot_price_series(prices_df, tickers_ordered, top_n=15, label='market cap',
                e.g. 'market cap' or 'stock price'.
     """
     if save_path is None:
-        save_path = GENERAL_DIR / 'price_series_market-cap.png'
+        save_path = OUTPUTS_DIR / 'price_series_market-cap.png'
 
     top_tickers = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
     colors = plt.cm.tab20.colors
@@ -108,7 +108,7 @@ def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
     Top N shown in green, bottom N in coral, with a gap between groups.
     """
     if save_path is None:
-        save_path = GENERAL_DIR / 'market_cap_bars.png'
+        save_path = OUTPUTS_DIR / 'market_cap_bars.png'
 
     available     = [t for t in tickers_ordered if t in prices_df.columns]
     top           = available[:top_n]
@@ -196,7 +196,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
               inverse correlators (r < 0) drawn as dashed lines.
     """
     if save_path is None:
-        save_path = CORRELATION_DIR / f'analysis_{target}.png'
+        save_path = OUTPUTS_DIR / f'analysis_{target}.png'
 
     fig, (ax_sc, ax_ts) = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle(f'{target} — Prediction Analysis (Random Forest)',

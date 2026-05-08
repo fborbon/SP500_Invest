@@ -5,13 +5,6 @@ BASE_DIR    = Path(__file__).parent
 OUTPUTS_DIR = BASE_DIR / 'outputs'
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
-# Static dirs kept for demo mode and chart defaults
-GENERAL_DIR     = OUTPUTS_DIR / 'General'
-CORRELATION_DIR = OUTPUTS_DIR / 'Correlation_method'
-GENERAL_DIR.mkdir(exist_ok=True)
-CORRELATION_DIR.mkdir(exist_ok=True)
-
-
 def create_run_dirs() -> tuple:
     """Create a timestamped output folder tree for a single bot run.
 
