@@ -329,6 +329,59 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
     _plot(by_norm, save_path_norm, 'normalized volume growth')
 
 
+def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
+    """Two-subplot PNG of cumulative returns for all tickers.
+
+    Top subplot    — normalized price (base = 100).
+    Bottom subplot — cumulative return in % (starts at 0).
+
+    Top N tickers by highest final cumulative return are highlighted in color.
+    """
+    if save_path is None:
+        save_path = OUTPUTS_DIR / 'cumulative_returns.png'
+
+    cum_ret  = (prices_df / prices_df.iloc[0] - 1) * 100
+    by_ret   = cum_ret.iloc[-1].sort_values(ascending=False).index.tolist()
+    top_t    = by_ret[:top_n]
+    colors   = plt.cm.tab20.colors
+
+    fig, (ax_norm, ax_ret) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
+                                           gridspec_kw={'hspace': 0.06})
+    fig.suptitle(f'S&P 500 Cumulative Returns — Top {len(top_t)} best performers highlighted',
+                 fontsize=13, fontweight='bold')
+
+    def normalize(series):
+        return series / series.iloc[0] * 100
+
+    for ax, data_fn in [(ax_norm, normalize), (ax_ret, lambda s: cum_ret[s.name])]:
+        for t in prices_df.columns:
+            if t not in top_t:
+                d = data_fn(prices_df[t]) if ax is ax_norm else cum_ret[t]
+                ax.plot(prices_df.index, d, color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+        for idx, t in enumerate(top_t):
+            d = normalize(prices_df[t]) if ax is ax_norm else cum_ret[t]
+            ax.plot(prices_df.index, d, color=colors[idx % 20], linewidth=1.6, alpha=0.9,
+                    label=t, zorder=2)
+        ax.grid(True, alpha=0.2)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    ax_ret.axhline(0, color='grey', linewidth=0.8, linestyle='--', alpha=0.6)
+    ax_norm.set_ylabel('Normalized price (base = 100)')
+    ax_norm.set_title('Normalized price')
+    ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+    ax_ret.set_ylabel('Cumulative return (%)')
+    ax_ret.set_title('Cumulative return (%)')
+    ax_ret.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+    ax_ret.set_xlabel('Date')
+    ax_ret.tick_params(axis='x', rotation=30)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Cumulative returns saved to: {save_path}")
+
+
 def plot_prediction_analysis(target: str, returns, prices_df,
                               top5: list, corr_signs: dict,
                               y_actual: np.ndarray, y_predicted: np.ndarray,

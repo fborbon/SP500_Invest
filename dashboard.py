@@ -133,12 +133,13 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_corr = st.tabs([
+tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_returns, tab_corr = st.tabs([
     '📋 Signals',
     '🏦 Fundamentals',
     '📊 Market Cap',
     '📈 Price Series',
     '📦 Volume',
+    '💹 Cumulative Returns',
     '🔗 Correlation Analysis',
 ])
 
@@ -546,7 +547,84 @@ with tab_volume:
             st.plotly_chart(_volume_chart(by_norm_v, f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth'), use_container_width=True)
 
 
-# ── Tab 6: Correlation Analysis ───────────────────────────────────────────────
+# ── Tab 6: Cumulative Returns ─────────────────────────────────────────────────
+with tab_returns:
+    prices_path_r = run_dir / 'prices.csv'
+    if not prices_path_r.exists():
+        st.info('prices.csv not found — re-run the bot to enable this tab.')
+    else:
+        ret_prices = pd.read_csv(prices_path_r, index_col=0, parse_dates=True)
+        sdf_r = pd.read_csv(run_dir / 'signals.csv') if (run_dir / 'signals.csv').exists() else None
+        nm_r  = dict(zip(sdf_r['ticker'], sdf_r['company_name'])) if sdf_r is not None and 'company_name' in sdf_r.columns else {}
+
+        # Cumulative return: (price / price[0]) - 1, expressed as %
+        cum_ret = (ret_prices / ret_prices.iloc[0] - 1) * 100
+
+        # Highlight: top N by final cumulative return
+        by_return = cum_ret.iloc[-1].sort_values(ascending=False).index.tolist()
+        top_t_r   = by_return[:TOP_N_HIGHLIGHT]
+
+        COLORS_R = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                    '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+                    '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
+
+        fig_r = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                              subplot_titles=['Normalized price (base = 100)',
+                                             'Cumulative return (%)'])
+
+        # Background gray traces
+        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+        for t in ret_prices.columns:
+            if t not in top_t_r:
+                nv = ret_prices[t] / ret_prices[t].iloc[0] * 100
+                x_bg_n.extend(list(ret_prices.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                x_bg_a.extend(list(cum_ret.index) + [None]);    y_bg_a.extend(list(cum_ret[t]) + [None])
+        if x_bg_n:
+            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                fig_r.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                           line=dict(color='lightgray', width=0.5),
+                                           showlegend=False, hoverinfo='skip'), row=rn, col=1)
+
+        for i, t in enumerate(top_t_r):
+            company = nm_r.get(t, t)
+            nv      = ret_prices[t] / ret_prices[t].iloc[0] * 100
+            color   = COLORS_R[i % len(COLORS_R)]
+            fig_r.add_trace(go.Scatter(
+                x=ret_prices.index, y=nv, mode='lines', name=t,
+                line=dict(color=color, width=1.8),
+                hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                               '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
+            ), row=1, col=1)
+            fig_r.add_trace(go.Scatter(
+                x=cum_ret.index, y=cum_ret[t], mode='lines', name=t,
+                line=dict(color=color, width=1.8), showlegend=False,
+                hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                               '%{x|%Y-%m-%d}<br>Return: %{y:+.2f}%<extra></extra>'),
+            ), row=2, col=1)
+
+        fig_r.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8, row=2, col=1)
+        fig_r.update_layout(
+            title=f'Cumulative Returns — Top {TOP_N_HIGHLIGHT} best performers highlighted',
+            height=860, hovermode='closest',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        )
+        fig_r.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+        fig_r.update_yaxes(title_text='Cumulative return (%)',  row=2, col=1)
+        fig_r.update_xaxes(title_text='Date',                   row=2, col=1)
+        fig_r.update_xaxes(rangeselector=dict(buttons=[
+            dict(count=1,  label='1M',  step='month', stepmode='backward'),
+            dict(count=3,  label='3M',  step='month', stepmode='backward'),
+            dict(count=6,  label='6M',  step='month', stepmode='backward'),
+            dict(count=1,  label='YTD', step='year',  stepmode='todate'),
+            dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
+            dict(step='all', label='All'),
+        ]), row=1, col=1)
+
+        with st.spinner('Rendering chart...'):
+            st.plotly_chart(fig_r, use_container_width=True)
+
+
+# ── Tab 7: Correlation Analysis ───────────────────────────────────────────────
 with tab_corr:
     if not corr_dir.exists():
         st.info('No Correlation_method/ plots found for this run.')

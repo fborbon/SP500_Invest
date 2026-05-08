@@ -10,9 +10,10 @@ from analysis.fundamentals import fetch_fundamentals, score_fundamentals, save_f
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
 from analysis.signals import generate_signals
-from reporting.charts import (plot_correlation_matrix, plot_market_cap_bars,
-                               plot_market_cap_series, plot_prediction_analysis,
-                               plot_price_series, plot_volume_series)
+from reporting.charts import (plot_correlation_matrix, plot_cumulative_returns,
+                               plot_market_cap_bars, plot_market_cap_series,
+                               plot_prediction_analysis, plot_price_series,
+                               plot_volume_series)
 from reporting.report import print_report, save_signals_csv
 
 
@@ -117,6 +118,10 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
                            save_path_abs=gen_dir  / 'volume_series_absolute.png',
                            save_path_norm=gen_dir / 'volume_series_normalized.png')
+
+        print("\nGeneral/ — cumulative returns (top N best performers highlighted)")
+        plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT,
+                                save_path=gen_dir / 'cumulative_returns.png')
 
         print("\nGenerate tables for: top N by predicted return  +  all BUY/SELL tickers")
         # Correlation_method/ — per-ticker prediction analysis
