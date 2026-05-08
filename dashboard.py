@@ -278,25 +278,33 @@ var nm = {nm_json};
 var opt = {opt_json};
 
 // Tooltip: show company name + ticker + value for hovered series only
+// Track mouse Y so formatter can find the nearest series
+var _mouseY = 0;
+chart.getZr().on('mousemove', function(e){{ _mouseY = e.offsetY; }});
+
 opt.tooltip = {{
   trigger: 'axis',
   axisPointer: {{ type: 'cross', link: [{{xAxisIndex: 'all'}}] }},
   confine: true,
   formatter: function(params) {{
     if(!params || params.length === 0) return '';
-    var seen = {{}}, lines = [], date = '';
+    var best = null, bestDist = Infinity;
     params.forEach(function(p) {{
       if(p.seriesName.startsWith('__bg')) return;
-      if(seen[p.seriesName]) return;
       if(!p.data || p.data[1] === null || p.data[1] === undefined) return;
-      seen[p.seriesName] = true;
-      if(!date) date = p.data[0];
-      var company = nm[p.seriesName] || p.seriesName;
-      var val = parseFloat(p.data[1]).toFixed(2);
-      lines.push(p.marker + ' <b>' + company + '</b> (' + p.seriesName + '): ' + val);
+      try {{
+        var opt2 = chart.getOption();
+        var yIdx = (opt2.series[p.seriesIndex] || {{}}).yAxisIndex || 0;
+        var pixY = chart.convertToPixel({{yAxisIndex: yIdx}}, parseFloat(p.data[1]));
+        var dist = Math.abs(pixY - _mouseY);
+        if(dist < bestDist) {{ bestDist = dist; best = p; }}
+      }} catch(e) {{}}
     }});
-    if(lines.length === 0) return '';
-    return date + '<br/>' + lines.join('<br/>');
+    if(!best) return '';
+    var company = nm[best.seriesName] || best.seriesName;
+    return best.data[0] + '<br/>' + best.marker +
+           ' <b>' + company + '</b> (' + best.seriesName + '): ' +
+           parseFloat(best.data[1]).toFixed(2);
   }}
 }};
 
