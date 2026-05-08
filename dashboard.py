@@ -291,37 +291,52 @@ with tab_prices:
                   '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
                   '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
 
-        def _series_chart(ordered, title, normalize=False):
+        def _series_chart(ordered, title):
             top_t = [t for t in ordered if t in prices_df.columns][:TOP_N_HIGHLIGHT]
-            fig   = go.Figure()
-            x_bg, y_bg = [], []
+            fig   = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                                  vertical_spacing=0.06,
+                                  subplot_titles=['Normalized price (base = 100)', 'Close price ($)'])
+
+            x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
             for t in prices_df.columns:
                 if t not in top_t:
-                    v = prices_df[t] / prices_df[t].iloc[0] * 100 if normalize else prices_df[t]
-                    x_bg.extend(list(prices_df.index) + [None])
-                    y_bg.extend(list(v) + [None])
-            if x_bg:
-                fig.add_trace(go.Scatter(x=x_bg, y=y_bg, mode='lines',
-                                         line=dict(color='lightgray', width=0.5),
-                                         showlegend=False, hoverinfo='skip'))
+                    norm_v = prices_df[t] / prices_df[t].iloc[0] * 100
+                    x_bg_n.extend(list(prices_df.index) + [None])
+                    y_bg_n.extend(list(norm_v) + [None])
+                    x_bg_a.extend(list(prices_df.index) + [None])
+                    y_bg_a.extend(list(prices_df[t]) + [None])
+            if x_bg_n:
+                for row, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                    fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                             line=dict(color='lightgray', width=0.5),
+                                             showlegend=False, hoverinfo='skip'),
+                                  row=row, col=1)
+
             for i, t in enumerate(top_t):
                 company = nm.get(t, t)
-                v       = prices_df[t] / prices_df[t].iloc[0] * 100 if normalize else prices_df[t]
+                norm_v  = prices_df[t] / prices_df[t].iloc[0] * 100
+                color   = COLORS[i % len(COLORS)]
                 fig.add_trace(go.Scatter(
-                    x=prices_df.index, y=v, mode='lines', name=t,
-                    line=dict(color=COLORS[i % len(COLORS)], width=1.8),
+                    x=prices_df.index, y=norm_v, mode='lines', name=t,
+                    line=dict(color=color, width=1.8),
                     hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                   f'%{{x|%Y-%m-%d}}<br>'
-                                   f'{"Norm." if normalize else "Price ($)"}: %{{y:,.2f}}'
-                                   '<extra></extra>'),
-                ))
+                                   '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
+                ), row=1, col=1)
+                fig.add_trace(go.Scatter(
+                    x=prices_df.index, y=prices_df[t], mode='lines', name=t,
+                    line=dict(color=color, width=1.8), showlegend=False,
+                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                                   '%{x|%Y-%m-%d}<br>Price ($): %{y:,.2f}<extra></extra>'),
+                ), row=2, col=1)
+
             fig.update_layout(
-                title=title, height=480,
-                xaxis_title='Date',
-                yaxis_title='Normalized price (base=100)' if normalize else 'Close price ($)',
-                hovermode='x unified',
+                title=title, height=820,
+                hovermode='closest',
                 legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
             )
+            fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+            fig.update_yaxes(title_text='Close price ($)',        row=2, col=1)
+            fig.update_xaxes(title_text='Date',                   row=2, col=1)
             return fig
 
         mcap_col = 'market_cap_B' if 'market_cap_B' in sdf_full.columns else None
@@ -331,13 +346,13 @@ with tab_prices:
         by_price = prices_df.iloc[-1].sort_values(ascending=False).index.tolist()
         by_norm  = (prices_df.iloc[-1] / prices_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
-        for ordering, title, norm in [
-            (by_mcap,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap',       False),
-            (by_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price',       False),
-            (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return', True),
+        for ordering, title in [
+            (by_mcap,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap'),
+            (by_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price'),
+            (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return'),
         ]:
             st.subheader(title)
-            st.plotly_chart(_series_chart(ordering, title, norm), use_container_width=True)
+            st.plotly_chart(_series_chart(ordering, title), use_container_width=True)
             st.divider()
     else:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
