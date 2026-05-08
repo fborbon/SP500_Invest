@@ -180,7 +180,7 @@ if __name__ == '__main__':
         run_demo()
 
     elif mode == 'paper':
-        run_bot(execute_trades=True, n_tickers=n)
+        run_bot(execute_trades=False, n_tickers=n)
 
     elif mode == 'live':
         confirm = input("Confirm execution on LIVE account? (type YES): ")
