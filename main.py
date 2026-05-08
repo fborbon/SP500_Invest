@@ -97,12 +97,14 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                              save_path=gen_dir / 'market_cap_bars.png')
 
         # Correlation_method/ — per-ticker prediction analysis
-        top_signals_n = 15
-        top_signals = signals_df.head(top_signals_n)
-        if not top_signals.empty:
-            print("\nGenerating analysis charts...")
-        for _, row in top_signals.iterrows():
-            ticker = row['ticker']
+        # Generate for: top N by predicted return  +  all BUY/SELL tickers
+        top_return_tickers = set(signals_df.head(TOP_N_HIGHLIGHT)['ticker'])
+        buysell_tickers    = set(signals_df[signals_df['signal'].isin(['BUY', 'SELL'])]['ticker'])
+        analysis_tickers   = top_return_tickers | buysell_tickers
+
+        if analysis_tickers:
+            print(f"\nGenerating analysis charts ({len(analysis_tickers)} tickers)...")
+        for ticker in sorted(analysis_tickers):
             pred_ret, r2, top5, corr_signs, y_actual, y_pred = predict_price(
                 ticker, returns, corr_matrix
             )
