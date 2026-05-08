@@ -279,15 +279,24 @@ var opt = {opt_json};
 
 // Tooltip: show company name + ticker + value for hovered series only
 opt.tooltip = {{
-  trigger: 'item',
+  trigger: 'axis',
+  axisPointer: {{ type: 'cross', link: [{{xAxisIndex: 'all'}}] }},
   confine: true,
-  formatter: function(p) {{
-    if(!p.data || p.data[1]===null) return '';
-    if(p.seriesName.startsWith('__bg')) return '';
-    var company = nm[p.seriesName] || p.seriesName;
-    var val = parseFloat(p.data[1]).toFixed(2);
-    return '<b>' + company + '</b> (' + p.seriesName + ')<br/>' +
-           p.data[0] + '<br/>' + val;
+  formatter: function(params) {{
+    if(!params || params.length === 0) return '';
+    var seen = {{}}, lines = [], date = '';
+    params.forEach(function(p) {{
+      if(p.seriesName.startsWith('__bg')) return;
+      if(seen[p.seriesName]) return;
+      if(!p.data || p.data[1] === null || p.data[1] === undefined) return;
+      seen[p.seriesName] = true;
+      if(!date) date = p.data[0];
+      var company = nm[p.seriesName] || p.seriesName;
+      var val = parseFloat(p.data[1]).toFixed(2);
+      lines.push(p.marker + ' <b>' + company + '</b> (' + p.seriesName + '): ' + val);
+    }});
+    if(lines.length === 0) return '';
+    return date + '<br/>' + lines.join('<br/>');
   }}
 }};
 
