@@ -3,7 +3,9 @@ from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent
 OUTPUTS_DIR = BASE_DIR / 'outputs'
+CACHE_DIR   = BASE_DIR / 'cache'
 OUTPUTS_DIR.mkdir(exist_ok=True)
+CACHE_DIR.mkdir(exist_ok=True)
 
 def create_run_dirs() -> tuple:
     """Create a timestamped output folder tree for a single bot run.
@@ -46,6 +48,10 @@ EXCLUDED_TICKERS = {'GOOGL'}
 
 # Number of top companies highlighted in price series and bar charts
 TOP_N_HIGHLIGHT  = 15
+
+# Data cache
+PRICE_CACHE_OVERLAP_DAYS  = 15   # calendar days to re-fetch for split/dividend adjustments
+MCAP_CACHE_MAX_AGE_HOURS  = 24   # hours before market-cap snapshot is considered stale
 
 # Model parameters
 HISTORY_DAYS     = 800     # Days of history for correlation calculation

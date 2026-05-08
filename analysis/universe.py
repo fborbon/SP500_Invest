@@ -7,7 +7,10 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from config import FALLBACK_TICKERS, EXCLUDED_TICKERS
+import datetime
+import json
+
+from config import CACHE_DIR, FALLBACK_TICKERS, EXCLUDED_TICKERS, MCAP_CACHE_MAX_AGE_HOURS
 
 _HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 
@@ -34,8 +37,8 @@ def get_sp500_tickers(n=None) -> list:
 
     all_tickers = [t for t in all_tickers if t not in EXCLUDED_TICKERS]
         
-    print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance (this takes ~30s)...")
-    caps = fetch_market_caps(all_tickers)
+    print(f"  Sorting {len(all_tickers)} tickers by market cap...")
+    caps = fetch_market_caps_cached(all_tickers)
     caps = dict(sorted(caps.items(), key=lambda item: item[1], reverse=True))
     all_tickers = sorted(all_tickers, key=lambda t: caps.get(t, 0), reverse=True)
 
@@ -98,6 +101,45 @@ def fetch_market_caps(tickers: list) -> dict:
     caps = _fetch_caps_parallel(tickers)
     fetched = sum(1 for v in caps.values() if v > 0)
     print(f"  ✓ Market caps retrieved: {fetched}/{len(tickers)}")
+    return caps
+
+
+def fetch_market_caps_cached(tickers: list) -> dict:
+    """Cached version of fetch_market_caps.
+
+    Reuses a JSON snapshot when it is younger than MCAP_CACHE_MAX_AGE_HOURS.
+    Any ticker missing from the cache is fetched individually and added.
+    """
+    CACHE_DIR.mkdir(exist_ok=True)
+    cache_path = CACHE_DIR / 'market_caps_cache.json'
+
+    if cache_path.exists():
+        with open(cache_path) as f:
+            data = json.load(f)
+        ts  = datetime.datetime.fromisoformat(data['timestamp'])
+        age = (datetime.datetime.now() - ts).total_seconds() / 3600
+
+        if age < MCAP_CACHE_MAX_AGE_HOURS:
+            cached_caps = data['caps']
+            missing = [t for t in tickers if t not in cached_caps]
+            if not missing:
+                print(f"  Using cached market caps (age: {age:.1f}h)")
+                return {t: cached_caps.get(t, 0) for t in tickers}
+            print(f"  Cache hit ({age:.1f}h old), fetching {len(missing)} missing tickers...")
+            fresh = _fetch_caps_parallel(missing)
+            cached_caps.update(fresh)
+            data['caps'] = cached_caps
+            data['timestamp'] = datetime.datetime.now().isoformat()
+            with open(cache_path, 'w') as f:
+                json.dump(data, f)
+            print(f"  ✓ Market caps cache updated ({len(cached_caps)} tickers)")
+            return {t: cached_caps.get(t, 0) for t in tickers}
+
+    print(f"  Market caps cache missing or stale — fetching fresh data...")
+    caps = fetch_market_caps(tickers)
+    with open(cache_path, 'w') as f:
+        json.dump({'timestamp': datetime.datetime.now().isoformat(), 'caps': caps}, f)
+    print(f"  ✓ Market caps cache saved ({len(caps)} tickers)")
     return caps
 
 

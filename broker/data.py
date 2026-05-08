@@ -5,7 +5,7 @@ import pandas as pd
 import yfinance as yf
 from ib_insync import IB, util
 
-from config import HISTORY_DAYS
+from config import CACHE_DIR, HISTORY_DAYS, PRICE_CACHE_OVERLAP_DAYS
 from broker.connection import get_contract
 
 
@@ -138,3 +138,92 @@ def fetch_volume_free(tickers: list) -> pd.DataFrame:
 
     print(f"  Volume data: {len(volume.columns)}/{len(tickers)} tickers")
     return volume
+
+
+# ── Cached fetch helpers ──────────────────────────────────────────────────────
+
+def _fetch_col_from_date(tickers: list, start: str, col: str) -> pd.DataFrame:
+    """Download a single OHLCV column for tickers starting from a given date."""
+    yf_tickers = [t.replace('.', '-') for t in tickers]
+    ticker_map  = dict(zip(yf_tickers, tickers))
+    raw = yf.download(yf_tickers, start=start, interval='1d',
+                      auto_adjust=True, progress=False, threads=True)
+    if raw.empty:
+        return pd.DataFrame()
+    if isinstance(raw.columns, pd.MultiIndex):
+        df = raw[col].rename(columns=ticker_map)
+    else:
+        df = raw[[col]].rename(columns={col: tickers[0]})
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    return df
+
+
+def _update_ohlcv_cache(cache_path, tickers: list, col: str,
+                        full_fetch_fn) -> pd.DataFrame:
+    """Load parquet cache, fetch only new days, append, save, return tail.
+
+    - Re-fetches a PRICE_CACHE_OVERLAP_DAYS window to capture price adjustments.
+    - Fetches full history for any tickers not yet in the cache.
+    - Cache grows over time; all tickers ever fetched are retained.
+    """
+    if cache_path.exists():
+        cached = pd.read_parquet(cache_path)
+        cached.index = pd.to_datetime(cached.index).tz_localize(None)
+        cached = cached.sort_index()
+
+        last_date   = cached.index[-1]
+        days_behind = (pd.Timestamp.today() - last_date).days
+
+        if days_behind < 1:
+            print(f"  Cache up to date (last: {last_date.date()})")
+        else:
+            existing = [t for t in tickers if t in cached.columns]
+            new_t    = [t for t in tickers if t not in cached.columns]
+
+            # Overlap start: go back enough calendar days to cover PRICE_CACHE_OVERLAP_DAYS trading days
+            overlap_start = (last_date - pd.Timedelta(days=PRICE_CACHE_OVERLAP_DAYS * 2)).strftime('%Y-%m-%d')
+
+            if existing:
+                print(f"  Fetching incremental {col} for {len(existing)} tickers (from {overlap_start})...")
+                fresh = _fetch_col_from_date(existing, overlap_start, col)
+                if not fresh.empty:
+                    cut = fresh.index[0]
+                    cached = pd.concat([cached[cached.index < cut], fresh])
+                    cached = cached.sort_index()
+                    cached = cached[~cached.index.duplicated(keep='last')]
+
+            if new_t:
+                print(f"  Fetching full history for {len(new_t)} new tickers...")
+                full_new = full_fetch_fn(new_t)
+                for t in full_new.columns:
+                    cached[t] = full_new[t].reindex(cached.index)
+                cached = cached.sort_index()
+    else:
+        print(f"  No cache found — fetching full history for {len(tickers)} tickers...")
+        CACHE_DIR.mkdir(exist_ok=True)
+        cached = full_fetch_fn(tickers)
+
+    cached.to_parquet(cache_path)
+    print(f"  Cache saved: {cache_path.name}  "
+          f"({len(cached.columns)} tickers, {len(cached)} days, "
+          f"last: {cached.index[-1].date()})")
+
+    result = cached[[t for t in tickers if t in cached.columns]].tail(HISTORY_DAYS)
+    result.dropna(axis=1, how='all', inplace=True)
+    return result
+
+
+def fetch_prices_cached(tickers: list) -> pd.DataFrame:
+    """Cached version of fetch_prices_free — only downloads new trading days."""
+    print("\nLoading prices from cache + incremental update...")
+    return _update_ohlcv_cache(
+        CACHE_DIR / 'prices_cache.parquet', tickers, 'Close', fetch_prices_free
+    )
+
+
+def fetch_volume_cached(tickers: list) -> pd.DataFrame:
+    """Cached version of fetch_volume_free — only downloads new trading days."""
+    print("\nLoading volume from cache + incremental update...")
+    return _update_ohlcv_cache(
+        CACHE_DIR / 'volume_cache.parquet', tickers, 'Volume', fetch_volume_free
+    )

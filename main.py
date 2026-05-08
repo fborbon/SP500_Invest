@@ -3,9 +3,10 @@ warnings.filterwarnings('ignore')
 
 from config import MIN_R2, OUTPUTS_DIR, TOP_N_HIGHLIGHT, create_run_dirs
 from broker.connection import connect_ib
-from broker.data import fetch_prices, fetch_prices_free, fetch_volume_free
+from broker.data import (fetch_prices, fetch_prices_free, fetch_prices_cached,
+                         fetch_volume_free, fetch_volume_cached)
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
-from analysis.universe import fetch_company_metadata, get_sp500_tickers
+from analysis.universe import fetch_company_metadata, fetch_market_caps_cached, get_sp500_tickers
 from analysis.fundamentals import fetch_fundamentals, score_fundamentals, save_fundamentals_csv
 from analysis.correlations import compute_correlations, get_top_correlated_pairs, get_top_inverse_pairs
 from analysis.model import predict_price
@@ -34,7 +35,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     tickers, market_caps = get_sp500_tickers(n=n_tickers)
 
     print("\nFetch stock prices")
-    prices_df = fetch_prices_free(tickers)
+    prices_df = fetch_prices_cached(tickers)
     if prices_df.empty or len(prices_df.columns) < 5:
         print("✗ Insufficient data. Aborting.")
         return
@@ -67,7 +68,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     prices_df.to_csv(run_dir / 'prices.csv')
 
     print("\nFetch and save daily volume data")
-    volume_df = fetch_volume_free(list(prices_df.columns))
+    volume_df = fetch_volume_cached(list(prices_df.columns))
     volume_df.to_csv(run_dir / 'volume.csv')
 
     print("\nFetch and save the Fundamental analysis table")

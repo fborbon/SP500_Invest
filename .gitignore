@@ -21,3 +21,4 @@ outputs/**/*.csv
 
 # Claude Code local memory
 .claude/
+cache/
