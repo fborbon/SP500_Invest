@@ -25,56 +25,63 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         n_tickers:      Number of top S&P 500 companies by market cap to use.
                         None = full universe (~503 tickers).
     """
+    print("\nCreate local folders")
     run_dir, gen_dir, corr_dir = create_run_dirs()
 
-    print("\nFetching S&P 500 universe...")
+    print("\nFetching S&P 500 tickers and market_caps")
     tickers, market_caps = get_sp500_tickers(n=n_tickers)
 
+    print("\nFetch stock prices")
     prices_df = fetch_prices_free(tickers)
     if prices_df.empty or len(prices_df.columns) < 5:
         print("✗ Insufficient data. Aborting.")
         return
 
-    print("\nCalculating correlations...")
+    print("\nCalculating correlations")
     corr_matrix, returns = compute_correlations(prices_df)
     top_pairs     = get_top_correlated_pairs(corr_matrix, top_n=10)
     inverse_pairs = get_top_inverse_pairs(corr_matrix, top_n=10)
 
+    print("\nGenerate the signals table")
     signals_df = generate_signals(prices_df, returns, corr_matrix)
 
-    # Enrich signals with company name, sector, founded year, market cap (B)
+    print("\nEnrich signals with company name, sector, founded year, market cap (B)")
     company_meta = fetch_company_metadata(list(prices_df.columns), market_caps)
     signals_df = signals_df.merge(
         company_meta.reset_index().rename(columns={'index': 'ticker'}),
         on='ticker', how='left'
     )
-    # Reorder columns so metadata appears right after ticker
+    
+    print("\nReorder columns so metadata appears right after ticker")
     meta_cols = ['company_name', 'sector', 'founded', 'market_cap_B']
     other_cols = [c for c in signals_df.columns if c not in ['ticker'] + meta_cols]
     signals_df = signals_df[['ticker'] + meta_cols + other_cols]
 
+    print("\nSave signals table to file")
     print_report(signals_df, top_pairs, inverse_pairs)
     save_signals_csv(signals_df, run_dir / 'signals.csv')
 
-    # Save prices for the dashboard interactive charts
+    print("\nSave prices for the dashboard interactive charts")
     prices_df.to_csv(run_dir / 'prices.csv')
 
+    print("\nFetch and save the Fundamental analysis table")
     # Fundamental analysis table
     fund_raw = fetch_fundamentals(list(prices_df.columns))
     fund_df  = score_fundamentals(fund_raw)
     save_fundamentals_csv(fund_df, run_dir / 'fundamentals.csv')
 
+    print("\nSave plots")
     if save_plots:
-        # Slice to top N by market cap for a legible heatmap
+        print("\nSlice to top N by market cap for a legible heatmap")
         top_t = [t for t in tickers if t in corr_matrix.columns][:TOP_N_HIGHLIGHT]
         plot_correlation_matrix(corr_matrix.loc[top_t, top_t],
                                 save_path=corr_dir / 'correlation_matrix.png')
 
-        # General/ — price series highlighted by market cap
+        print("\nGeneral/ — price series highlighted by market cap")
         plot_price_series(prices_df, tickers, top_n=TOP_N_HIGHLIGHT, label='market cap',
                           save_path=gen_dir / 'price_series_market-cap.png')
 
-        # General/ — price series highlighted by highest absolute stock price
+        print("\nGeneral/ — price series highlighted by highest absolute stock price")
         tickers_by_price = sorted(
             prices_df.columns.tolist(),
             key=lambda t: prices_df[t].iloc[-1],
@@ -83,7 +90,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_price_series(prices_df, tickers_by_price, top_n=TOP_N_HIGHLIGHT, label='stock price',
                           save_path=gen_dir / 'price_series_stock-price-absolute.png')
 
-        # General/ — price series highlighted by highest normalized return (best performers)
+        print("\nGeneral/ — price series highlighted by highest normalized return (best performers)")
         tickers_by_norm = sorted(
             prices_df.columns.tolist(),
             key=lambda t: prices_df[t].iloc[-1] / prices_df[t].iloc[0],
@@ -92,16 +99,18 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_price_series(prices_df, tickers_by_norm, top_n=TOP_N_HIGHLIGHT, label='normalized return',
                           save_path=gen_dir / 'price_series_normalized-return.png')
 
-        # General/ — bar chart: top 15 vs bottom 15 by market cap
+        print("\nGeneral/ — bar chart: top 15 vs bottom 15 by market cap")
         plot_market_cap_bars(prices_df, tickers, market_caps=market_caps, top_n=TOP_N_HIGHLIGHT,
                              save_path=gen_dir / 'market_cap_bars.png')
 
+        print("\nGenerate tables for: top N by predicted return  +  all BUY/SELL tickers")
         # Correlation_method/ — per-ticker prediction analysis
-        # Generate for: top N by predicted return  +  all BUY/SELL tickers
+        # Generate tables for: top N by predicted return  +  all BUY/SELL tickers
         top_return_tickers = set(signals_df.head(TOP_N_HIGHLIGHT)['ticker'])
         buysell_tickers    = set(signals_df[signals_df['signal'].isin(['BUY', 'SELL'])]['ticker'])
         analysis_tickers   = top_return_tickers | buysell_tickers
 
+        print("\nGenerating predition analysis plots")
         if analysis_tickers:
             print(f"\nGenerating analysis charts ({len(analysis_tickers)} tickers)...")
         for ticker in sorted(analysis_tickers):
@@ -115,6 +124,7 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                     save_path=corr_dir / f'analysis_{ticker}.png'
                 )
 
+    print("\nExecute trades in IBKR")
     if execute_trades:
         ib = connect_ib()
         try:
