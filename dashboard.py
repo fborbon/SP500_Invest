@@ -3,10 +3,12 @@ SP500 Correlation Bot — Dashboard
 Run with:  streamlit run dashboard.py
 """
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 from pathlib import Path
 
-from config import OUTPUTS_DIR
+from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -112,16 +114,81 @@ with tab_fund:
 # ── Tab 3: Price Series & Market Cap ─────────────────────────────────────────
 with tab_prices:
     gen_dir = run_dir / 'General'
+
+    # ── Interactive market cap bar chart (Plotly) ─────────────────────────────
+    signals_path = run_dir / 'signals.csv'
+    if signals_path.exists():
+        sdf = pd.read_csv(signals_path)
+        if {'ticker', 'company_name', 'current_price', 'market_cap_B', 'sector'}.issubset(sdf.columns):
+            sdf = sdf.dropna(subset=['market_cap_B']).sort_values('market_cap_B', ascending=False)
+            top    = sdf.head(TOP_N_HIGHLIGHT)
+            bottom = sdf.tail(TOP_N_HIGHLIGHT)
+
+            fig = make_subplots(
+                rows=2, cols=1,
+                shared_xaxes=False,
+                vertical_spacing=0.12,
+                subplot_titles=[
+                    f'Last Close Price ($) — top {TOP_N_HIGHLIGHT} vs bottom {TOP_N_HIGHLIGHT}',
+                    f'Market Capitalization ($B) — top {TOP_N_HIGHLIGHT} vs bottom {TOP_N_HIGHLIGHT}',
+                ],
+            )
+
+            hover_top = (
+                '<b>%{customdata[0]}</b><br>'
+                'Sector: %{customdata[1]}<br>'
+                'Price: $%{y:,.2f}<br>'
+                'Market Cap: $%{customdata[2]:.1f}B'
+                '<extra></extra>'
+            )
+            hover_bottom = (
+                '<b>%{customdata[0]}</b><br>'
+                'Sector: %{customdata[1]}<br>'
+                'Cap: $%{y:.1f}B<br>'
+                'Price: $%{customdata[2]:,.2f}'
+                '<extra></extra>'
+            )
+
+            for grp, colour, name in [(top, 'mediumseagreen', f'Top {TOP_N_HIGHLIGHT}'),
+                                      (bottom, 'tomato',         f'Bottom {TOP_N_HIGHLIGHT}')]:
+                cd_price = grp[['company_name', 'sector', 'market_cap_B']].values
+                cd_cap   = grp[['company_name', 'sector', 'current_price']].values
+
+                fig.add_trace(go.Bar(
+                    x=grp['ticker'], y=grp['current_price'],
+                    name=name, marker_color=colour,
+                    customdata=cd_price, hovertemplate=hover_top,
+                ), row=1, col=1)
+
+                fig.add_trace(go.Bar(
+                    x=grp['ticker'], y=grp['market_cap_B'],
+                    name=name, marker_color=colour, showlegend=False,
+                    customdata=cd_cap, hovertemplate=hover_bottom,
+                ), row=2, col=1)
+
+            fig.update_layout(
+                height=750,
+                title=f'Top vs Bottom {TOP_N_HIGHLIGHT} S&P 500 Companies',
+                barmode='group',
+                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+            )
+            fig.update_yaxes(title_text='Price ($)',    row=1, col=1)
+            fig.update_yaxes(title_text='Market Cap ($B)', row=2, col=1)
+
+            st.subheader('Market Cap Bars (interactive)')
+            st.plotly_chart(fig, use_container_width=True)
+            st.divider()
+
+    # ── Static price series PNGs ──────────────────────────────────────────────
     if not gen_dir.exists():
         st.info('No General/ plots found for this run.')
     else:
-        plots = sorted(gen_dir.glob('*.png'))
+        plots = sorted(p for p in gen_dir.glob('*.png') if 'price_series' in p.name)
         if not plots:
-            st.info('No PNG files in General/ for this run.')
+            st.info('No price series plots found for this run.')
         for plot in plots:
             title = (plot.stem
                      .replace('price_series_', 'Price Series — ')
-                     .replace('market_cap_bars', 'Market Cap Bars')
                      .replace('-', ' ')
                      .replace('_', ' ')
                      .title())
