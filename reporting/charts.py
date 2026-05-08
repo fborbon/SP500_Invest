@@ -21,6 +21,14 @@ def _save(fig, path):
     print(f"  Saved: {path}")
 
 
+def _dt(index):
+    """Convert DatetimeIndex to ISO date strings — kaleido/orjson cannot serialize Timestamps."""
+    try:
+        return index.strftime('%Y-%m-%d').tolist()
+    except AttributeError:
+        return list(index)
+
+
 def plot_correlation_matrix(corr_matrix, save_path=None):
     if save_path is None:
         save_path = OUTPUTS_DIR / 'correlation_matrix.png'
@@ -61,8 +69,8 @@ def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='
     for t in prices_df.columns:
         if t not in top_t:
             nv = prices_df[t] / prices_df[t].iloc[0] * 100
-            x_bg_n.extend(list(prices_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-            x_bg_a.extend(list(prices_df.index) + [None]); y_bg_a.extend(list(prices_df[t]) + [None])
+            x_bg_n.extend(_dt(prices_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+            x_bg_a.extend(_dt(prices_df.index) + [None]); y_bg_a.extend(list(prices_df[t]) + [None])
     if x_bg_n:
         for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
             fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -72,9 +80,9 @@ def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='
     for i, t in enumerate(top_t):
         nv    = prices_df[t] / prices_df[t].iloc[0] * 100
         color = COLORS[i % len(COLORS)]
-        fig.add_trace(go.Scatter(x=prices_df.index, y=nv, mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(prices_df.index), y=nv, mode='lines', name=t,
                                   line=dict(color=color, width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=prices_df.index, y=prices_df[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(prices_df.index), y=prices_df[t], mode='lines', name=t,
                                   line=dict(color=color, width=1.5),
                                   showlegend=False), row=2, col=1)
 
@@ -146,8 +154,8 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
         for t in mcap_df.columns:
             if t not in top_t:
                 nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                x_bg_n.extend(list(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                x_bg_a.extend(list(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
+                x_bg_n.extend(_dt(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                x_bg_a.extend(_dt(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
         if x_bg_n:
             for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                 fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -156,9 +164,9 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
         for i, t in enumerate(top_t):
             nv    = mcap_df[t] / mcap_df[t].iloc[0] * 100
             color = COLORS[i % len(COLORS)]
-            fig.add_trace(go.Scatter(x=mcap_df.index, y=nv, mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(mcap_df.index), y=nv, mode='lines', name=t,
                                       line=dict(color=color, width=1.5)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=mcap_df.index, y=mcap_df[t], mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(mcap_df.index), y=mcap_df[t], mode='lines', name=t,
                                       line=dict(color=color, width=1.5),
                                       showlegend=False), row=2, col=1)
         fig.update_layout(
@@ -191,8 +199,8 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
             if t not in top_t:
                 first = volume_df[t].replace(0, float('nan')).first_valid_index()
                 nv = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
-                x_bg_n.extend(list(volume_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                x_bg_a.extend(list(volume_df.index) + [None]); y_bg_a.extend(list(volume_df[t]) + [None])
+                x_bg_n.extend(_dt(volume_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                x_bg_a.extend(_dt(volume_df.index) + [None]); y_bg_a.extend(list(volume_df[t]) + [None])
         if x_bg_n:
             for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                 fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -202,9 +210,9 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
             first = volume_df[t].replace(0, float('nan')).first_valid_index()
             nv    = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
             color = COLORS[i % len(COLORS)]
-            fig.add_trace(go.Scatter(x=volume_df.index, y=nv, mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(volume_df.index), y=nv, mode='lines', name=t,
                                       line=dict(color=color, width=1.5)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=volume_df.index, y=volume_df[t], mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(volume_df.index), y=volume_df[t], mode='lines', name=t,
                                       line=dict(color=color, width=1.5),
                                       showlegend=False), row=2, col=1)
         fig.update_layout(
@@ -234,8 +242,8 @@ def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
     x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
     for t in prices_df.columns:
         if t not in top_t:
-            x_bg_p.extend(list(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
-            x_bg_u.extend(list(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
+            x_bg_p.extend(_dt(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
+            x_bg_u.extend(_dt(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
     if x_bg_p:
         for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
             fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -244,9 +252,9 @@ def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
 
     for i, t in enumerate(top_t):
         color = COLORS[i % len(COLORS)]
-        fig.add_trace(go.Scatter(x=cum_pct.index, y=cum_pct[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(cum_pct.index), y=cum_pct[t], mode='lines', name=t,
                                   line=dict(color=color, width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=cum_usd.index, y=cum_usd[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(cum_usd.index), y=cum_usd[t], mode='lines', name=t,
                                   line=dict(color=color, width=1.5),
                                   showlegend=False), row=2, col=1)
 
@@ -306,7 +314,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
 
     if target in prices_df.columns:
         fig.add_trace(go.Scatter(
-            x=prices_df.index, y=normalize(prices_df[target]), mode='lines',
+            x=_dt(prices_df.index), y=normalize(prices_df[target]), mode='lines',
             name=f'{target} (target)', line=dict(color='black', width=2.5),
         ), row=1, col=2)
 
@@ -315,7 +323,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
         direction = '↑' if r > 0 else '↓'
         dash      = 'solid' if r > 0 else 'dash'
         fig.add_trace(go.Scatter(
-            x=prices_df.index, y=normalize(prices_df[ticker]), mode='lines',
+            x=_dt(prices_df.index), y=normalize(prices_df[ticker]), mode='lines',
             name=f'{direction} {ticker}  r={r:+.2f}',
             line=dict(color=COLORS[i % len(COLORS)], dash=dash, width=1.4),
         ), row=1, col=2)
