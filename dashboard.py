@@ -354,13 +354,5 @@ with tab_corr:
             st.image(str(matrix_path), use_container_width=True)
             st.divider()
 
-        analysis_plots = sorted(corr_dir.glob('analysis_*.png'))
-        if analysis_plots:
-            st.subheader(f'Per-Ticker Prediction Analysis ({len(analysis_plots)} charts)')
-            for i in range(0, len(analysis_plots), 2):
-                cols = st.columns(2)
-                for j, plot in enumerate(analysis_plots[i:i + 2]):
-                    ticker = plot.stem.replace('analysis_', '')
-                    cols[j].image(str(plot), caption=ticker, use_container_width=True)
-        elif not matrix_path.exists():
+        if not matrix_path.exists():
             st.info('No plots found in Correlation_method/ for this run.')
