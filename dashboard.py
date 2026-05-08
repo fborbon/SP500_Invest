@@ -353,11 +353,11 @@ with tab_mcap:
                                                '%{x|%Y-%m-%d}<br>Cap ($B): %{y:,.1f}<extra></extra>'),
                             ), row=2, col=1)
                         fig_ts.update_layout(
-                            title=title, height=860, hovermode='closest',
+                            title=title, height=920, hovermode='closest',
                             legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
                         )
-                        fig_ts.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
-                        fig_ts.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1)
+                        fig_ts.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
+                        fig_ts.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1, autorange=True)
                         fig_ts.update_xaxes(title_text='Date',                   row=2, col=1)
                         fig_ts.update_xaxes(
                             rangeselector=dict(buttons=[
@@ -370,6 +370,7 @@ with tab_mcap:
                             ]),
                             row=1, col=1,
                         )
+                        fig_ts.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
                         return fig_ts
 
                     # Chart 1 — top by current (absolute) market cap
@@ -442,12 +443,12 @@ with tab_prices:
                 ), row=2, col=1)
 
             fig.update_layout(
-                title=title, height=860,
+                title=title, height=920,
                 hovermode='closest',
                 legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
             )
-            fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
-            fig.update_yaxes(title_text='Close price ($)',        row=2, col=1)
+            fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
+            fig.update_yaxes(title_text='Close price ($)',        row=2, col=1, autorange=True)
             fig.update_xaxes(title_text='Date',                   row=2, col=1)
             fig.update_xaxes(
                 rangeselector=dict(buttons=[
@@ -460,6 +461,7 @@ with tab_prices:
                 ]),
                 row=1, col=1,
             )
+            fig.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
             return fig
 
         mcap_col = 'market_cap_B' if 'market_cap_B' in sdf_full.columns else None
@@ -527,10 +529,10 @@ with tab_volume:
                     hovertemplate=(f'<b>{company}</b> ({t})<br>'
                                    '%{x|%Y-%m-%d}<br>Volume: %{y:,.0f}<extra></extra>'),
                 ), row=2, col=1)
-            fig_v.update_layout(title=title, height=860, hovermode='closest',
+            fig_v.update_layout(title=title, height=920, hovermode='closest',
                                 legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1))
-            fig_v.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
-            fig_v.update_yaxes(title_text='Volume (shares)',        row=2, col=1)
+            fig_v.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
+            fig_v.update_yaxes(title_text='Volume (shares)',        row=2, col=1, autorange=True)
             fig_v.update_xaxes(title_text='Date',                   row=2, col=1)
             fig_v.update_xaxes(rangeselector=dict(buttons=[
                 dict(count=1,  label='1M',  step='month', stepmode='backward'),
@@ -540,6 +542,7 @@ with tab_volume:
                 dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
                 dict(step='all', label='All'),
             ]), row=1, col=1)
+            fig_v.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
             return fig_v
 
         by_abs_v  = vol_df.mean().sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
@@ -611,11 +614,11 @@ with tab_returns:
             fig_r.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8, row=rn, col=1)
         fig_r.update_layout(
             title=f'Cumulative Returns — Top {TOP_N_HIGHLIGHT} best performers highlighted',
-            height=860, hovermode='closest',
+            height=920, hovermode='closest',
             legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
         )
-        fig_r.update_yaxes(title_text='Cumulative return (%)',   row=1, col=1)
-        fig_r.update_yaxes(title_text='Dollar return ($/share)', row=2, col=1)
+        fig_r.update_yaxes(title_text='Cumulative return (%)',   row=1, col=1, autorange=True)
+        fig_r.update_yaxes(title_text='Dollar return ($/share)', row=2, col=1, autorange=True)
         fig_r.update_xaxes(title_text='Date',                    row=2, col=1)
         fig_r.update_xaxes(rangeselector=dict(buttons=[
             dict(count=1,  label='1M',  step='month', stepmode='backward'),
@@ -625,6 +628,7 @@ with tab_returns:
             dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
             dict(step='all', label='All'),
         ]), row=1, col=1)
+        fig_r.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
 
         with st.spinner('Rendering chart...'):
             st.plotly_chart(fig_r, use_container_width=True)
