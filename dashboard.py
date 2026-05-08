@@ -133,11 +133,12 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_signals, tab_fund, tab_mcap, tab_prices, tab_corr = st.tabs([
+tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_corr = st.tabs([
     '📋 Signals',
     '🏦 Fundamentals',
     '📊 Market Cap',
     '📈 Price Series',
+    '📦 Volume',
     '🔗 Correlation Analysis',
 ])
 
@@ -472,7 +473,80 @@ with tab_prices:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
 
 
-# ── Tab 5: Correlation Analysis ───────────────────────────────────────────────
+# ── Tab 5: Volume ─────────────────────────────────────────────────────────────
+with tab_volume:
+    volume_path = run_dir / 'volume.csv'
+    if not volume_path.exists():
+        st.info('volume.csv not found — re-run the bot to enable this tab.')
+    else:
+        vol_df = pd.read_csv(volume_path, index_col=0, parse_dates=True)
+        sdf_vol = pd.read_csv(run_dir / 'signals.csv') if (run_dir / 'signals.csv').exists() else None
+        nm_vol  = dict(zip(sdf_vol['ticker'], sdf_vol['company_name'])) if sdf_vol is not None and 'company_name' in sdf_vol.columns else {}
+
+        COLORS_V = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                    '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+                    '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
+
+        def _volume_chart(top_t, title):
+            fig_v = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                                  subplot_titles=['Normalized volume (base = 100)', 'Volume (shares)'])
+            x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+            for t in vol_df.columns:
+                if t not in top_t:
+                    first = vol_df[t].replace(0, float('nan')).first_valid_index()
+                    nv = vol_df[t] / vol_df[t][first] * 100 if first else vol_df[t] * 0
+                    x_bg_n.extend(list(vol_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                    x_bg_a.extend(list(vol_df.index) + [None]); y_bg_a.extend(list(vol_df[t]) + [None])
+            if x_bg_n:
+                for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                    fig_v.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                               line=dict(color='lightgray', width=0.5),
+                                               showlegend=False, hoverinfo='skip'), row=rn, col=1)
+            for i, t in enumerate(top_t):
+                company = nm_vol.get(t, t)
+                first   = vol_df[t].replace(0, float('nan')).first_valid_index()
+                nv      = vol_df[t] / vol_df[t][first] * 100 if first else vol_df[t] * 0
+                color   = COLORS_V[i % len(COLORS_V)]
+                fig_v.add_trace(go.Scatter(
+                    x=vol_df.index, y=nv, mode='lines', name=t,
+                    line=dict(color=color, width=1.8),
+                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                                   '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
+                ), row=1, col=1)
+                fig_v.add_trace(go.Scatter(
+                    x=vol_df.index, y=vol_df[t], mode='lines', name=t,
+                    line=dict(color=color, width=1.8), showlegend=False,
+                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                                   '%{x|%Y-%m-%d}<br>Volume: %{y:,.0f}<extra></extra>'),
+                ), row=2, col=1)
+            fig_v.update_layout(title=title, height=860, hovermode='closest',
+                                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1))
+            fig_v.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+            fig_v.update_yaxes(title_text='Volume (shares)',        row=2, col=1)
+            fig_v.update_xaxes(title_text='Date',                   row=2, col=1)
+            fig_v.update_xaxes(rangeselector=dict(buttons=[
+                dict(count=1,  label='1M',  step='month', stepmode='backward'),
+                dict(count=3,  label='3M',  step='month', stepmode='backward'),
+                dict(count=6,  label='6M',  step='month', stepmode='backward'),
+                dict(count=1,  label='YTD', step='year',  stepmode='todate'),
+                dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
+                dict(step='all', label='All'),
+            ]), row=1, col=1)
+            return fig_v
+
+        by_abs_v  = vol_df.mean().sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+        by_norm_v = (vol_df.iloc[-1] / vol_df.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+
+        st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
+        with st.spinner('Rendering chart...'):
+            st.plotly_chart(_volume_chart(by_abs_v,  f'Top {TOP_N_HIGHLIGHT} by Average Volume'),  use_container_width=True)
+        st.divider()
+        st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth')
+        with st.spinner('Rendering chart...'):
+            st.plotly_chart(_volume_chart(by_norm_v, f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth'), use_container_width=True)
+
+
+# ── Tab 6: Correlation Analysis ───────────────────────────────────────────────
 with tab_corr:
     if not corr_dir.exists():
         st.info('No Correlation_method/ plots found for this run.')

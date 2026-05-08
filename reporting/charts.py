@@ -264,6 +264,71 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
     _plot(by_norm, save_path_norm, 'normalized cap growth')
 
 
+def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
+                       save_path_abs=None, save_path_norm=None):
+    """Two PNG files — daily traded volume time series.
+
+    Chart 1 (save_path_abs):  top N highlighted by highest total/average volume.
+    Chart 2 (save_path_norm): top N highlighted by normalised volume growth (latest/earliest).
+
+    Each chart has two subplots: normalised on top, absolute (shares) on bottom.
+    """
+    if save_path_abs is None:
+        save_path_abs  = OUTPUTS_DIR / 'volume_series_absolute.png'
+    if save_path_norm is None:
+        save_path_norm = OUTPUTS_DIR / 'volume_series_normalized.png'
+
+    colors = plt.cm.tab20.colors
+
+    by_abs  = volume_df.mean().sort_values(ascending=False).index.tolist()
+    by_norm = (volume_df.iloc[-1] / volume_df.iloc[0]).sort_values(ascending=False).index.tolist()
+
+    def _plot(ordered, save_path, label):
+        top_t = [t for t in ordered if t in volume_df.columns][:top_n]
+
+        fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
+                                               gridspec_kw={'hspace': 0.06})
+        fig.suptitle(f'S&P 500 Daily Volume — Top {len(top_t)} by {label} highlighted',
+                     fontsize=13, fontweight='bold')
+
+        def normalize(series):
+            first = series.replace(0, float('nan')).first_valid_index()
+            if first is None:
+                return series * 0
+            return series / series[first] * 100
+
+        for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
+            for t in volume_df.columns:
+                if t not in top_t:
+                    data = normalize(volume_df[t]) if use_norm else volume_df[t]
+                    ax.plot(volume_df.index, data, color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+            for idx, t in enumerate(top_t):
+                data = normalize(volume_df[t]) if use_norm else volume_df[t]
+                ax.plot(volume_df.index, data, color=colors[idx % 20], linewidth=1.6, alpha=0.9,
+                        label=t, zorder=2)
+            ax.grid(True, alpha=0.2)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+        ax_norm.set_ylabel('Normalized volume (base = 100)')
+        ax_norm.set_title('Normalized volume')
+        ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+
+        ax_abs.set_ylabel('Volume (shares)')
+        ax_abs.set_title('Absolute volume')
+        ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
+        ax_abs.set_xlabel('Date')
+        ax_abs.tick_params(axis='x', rotation=30)
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"  Volume series saved to: {save_path}")
+
+    _plot(by_abs,  save_path_abs,  'average volume')
+    _plot(by_norm, save_path_norm, 'normalized volume growth')
+
+
 def plot_prediction_analysis(target: str, returns, prices_df,
                               top5: list, corr_signs: dict,
                               y_actual: np.ndarray, y_predicted: np.ndarray,

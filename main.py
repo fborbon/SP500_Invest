@@ -3,7 +3,7 @@ warnings.filterwarnings('ignore')
 
 from config import MIN_R2, OUTPUTS_DIR, TOP_N_HIGHLIGHT, create_run_dirs
 from broker.connection import connect_ib
-from broker.data import fetch_prices, fetch_prices_free
+from broker.data import fetch_prices, fetch_prices_free, fetch_volume_free
 from broker.orders import calculate_position_size, execute_order, get_portfolio_value
 from analysis.universe import fetch_company_metadata, get_sp500_tickers
 from analysis.fundamentals import fetch_fundamentals, score_fundamentals, save_fundamentals_csv
@@ -12,7 +12,7 @@ from analysis.model import predict_price
 from analysis.signals import generate_signals
 from reporting.charts import (plot_correlation_matrix, plot_market_cap_bars,
                                plot_market_cap_series, plot_prediction_analysis,
-                               plot_price_series)
+                               plot_price_series, plot_volume_series)
 from reporting.report import print_report, save_signals_csv
 
 
@@ -65,6 +65,10 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     print("\nSave prices for the dashboard interactive charts")
     prices_df.to_csv(run_dir / 'prices.csv')
 
+    print("\nFetch and save daily volume data")
+    volume_df = fetch_volume_free(list(prices_df.columns))
+    volume_df.to_csv(run_dir / 'volume.csv')
+
     print("\nFetch and save the Fundamental analysis table")
     # Fundamental analysis table
     fund_raw = fetch_fundamentals(list(prices_df.columns))
@@ -108,6 +112,11 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
         plot_market_cap_series(prices_df, market_caps, top_n=TOP_N_HIGHLIGHT,
                                save_path_abs=gen_dir  / 'market_cap_series_absolute.png',
                                save_path_norm=gen_dir / 'market_cap_series_normalized.png')
+
+        print("\nGeneral/ — volume time series (absolute + normalized growth)")
+        plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
+                           save_path_abs=gen_dir  / 'volume_series_absolute.png',
+                           save_path_norm=gen_dir / 'volume_series_normalized.png')
 
         print("\nGenerate tables for: top N by predicted return  +  all BUY/SELL tickers")
         # Correlation_method/ — per-ticker prediction analysis

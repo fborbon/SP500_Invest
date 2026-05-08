@@ -104,3 +104,37 @@ def fetch_prices_free(tickers: list) -> pd.DataFrame:
         print(f"  ✓ {ticker}: {prices[ticker].count()} bars"
               f" — last close ${prices[ticker].dropna().iloc[-1]:.2f}")
     return prices
+
+
+def fetch_volume_free(tickers: list) -> pd.DataFrame:
+    """Download historical daily volume via Yahoo Finance — no IB needed.
+
+    Same batch request as fetch_prices_free; extracts the Volume column.
+    Returns a DataFrame with dates as index and original ticker names as columns.
+    """
+    yf_tickers = [t.replace('.', '-') for t in tickers]
+    ticker_map = dict(zip(yf_tickers, tickers))
+
+    calendar_days = math.ceil(HISTORY_DAYS * 365 / 252) + 10
+
+    print(f"\nDownloading historical volume via yfinance ({HISTORY_DAYS} trading days)...")
+    raw = yf.download(
+        yf_tickers,
+        period=f'{calendar_days}d',
+        interval='1d',
+        auto_adjust=True,
+        progress=False,
+        threads=True,
+    )
+
+    if isinstance(raw.columns, pd.MultiIndex):
+        volume = raw['Volume'].rename(columns=ticker_map)
+    else:
+        volume = raw[['Volume']].rename(columns={'Volume': tickers[0]})
+
+    volume.index = pd.to_datetime(volume.index).tz_localize(None)
+    volume = volume.tail(HISTORY_DAYS)
+    volume.dropna(axis=1, how='all', inplace=True)
+
+    print(f"  Volume data: {len(volume.columns)}/{len(tickers)} tickers")
+    return volume
