@@ -126,7 +126,7 @@ with tab_prices:
                      .replace('_', ' ')
                      .title())
             st.subheader(title)
-            st.image(str(plot), use_column_width=True)
+            st.image(str(plot), use_container_width=True)
             st.divider()
 
 
@@ -140,7 +140,7 @@ with tab_corr:
         matrix_path = corr_dir / 'correlation_matrix.png'
         if matrix_path.exists():
             st.subheader('Correlation Matrix')
-            st.image(str(matrix_path), use_column_width=True)
+            st.image(str(matrix_path), use_container_width=True)
             st.divider()
 
         # Per-ticker analysis charts — two per row
@@ -151,6 +151,6 @@ with tab_corr:
                 cols = st.columns(2)
                 for j, plot in enumerate(analysis_plots[i:i+2]):
                     ticker = plot.stem.replace('analysis_', '')
-                    cols[j].image(str(plot), caption=ticker, use_column_width=True)
+                    cols[j].image(str(plot), caption=ticker, use_container_width=True)
         elif not matrix_path.exists():
             st.info('No plots found in Correlation_method/ for this run.')
