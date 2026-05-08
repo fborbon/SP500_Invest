@@ -29,11 +29,14 @@ ACCOUNT   = ''             # Empty → use default account
 
 # Used as fallback when Wikipedia is unreachable, and for demo mode
 FALLBACK_TICKERS = [
-    'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL',
+    'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOG',
     'META', 'LLY',  'TSLA', 'JPM',  'V',
     'UNH',  'XOM',  'JNJ',  'WMT',  'MA',
     'PG',   'HD',   'AVGO', 'COST', 'NFLX'
 ]
+
+# Duplicate share classes to exclude (keep only the preferred class listed above)
+EXCLUDED_TICKERS = {'GOOGL'}
 
 # Number of top companies highlighted in price series and bar charts
 TOP_N_HIGHLIGHT  = 15

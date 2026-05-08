@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from config import FALLBACK_TICKERS
+from config import FALLBACK_TICKERS, EXCLUDED_TICKERS
 
 _HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 
@@ -31,6 +31,8 @@ def get_sp500_tickers(n=None) -> list:
         all_tickers = list(FALLBACK_TICKERS)
     else:
         all_tickers = _fetch_wikipedia()
+
+    all_tickers = [t for t in all_tickers if t not in EXCLUDED_TICKERS]
         
     print(f"  Sorting {len(all_tickers)} tickers by market cap via yfinance (this takes ~30s)...")
     caps = fetch_market_caps(all_tickers)
