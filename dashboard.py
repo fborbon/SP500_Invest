@@ -141,71 +141,66 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 def _show_with_yrescale(fig, height: int = 920):
     """Render a Plotly figure with y-axis auto-rescaling when x range changes.
 
-    Uses fig.to_html(include_plotlyjs='cdn') so the correct Plotly.js version
-    is loaded, then injects a plotly_relayout listener for y-axis rescaling.
-    The legend is moved inside the chart to avoid clipping in the fixed iframe.
+    Embeds the exact matching Plotly.js (include_plotlyjs=True) to avoid CDN
+    version mismatches, then injects a plotly_relayout listener that recomputes
+    y bounds from visible foreground traces whenever x range changes.
     """
-    # Move legend inside chart top-right to avoid clipping in the iframe
     fig.update_layout(
-        legend=dict(orientation='h', yanchor='top', y=0.99, xanchor='right', x=1,
-                    bgcolor='rgba(255,255,255,0.7)', borderwidth=0),
-        margin=dict(t=60, r=10, b=10, l=10),
+        legend=dict(orientation='v', yanchor='top', y=1, xanchor='left', x=1.01,
+                    font=dict(size=10)),
+        margin=dict(t=50, r=160, b=10, l=60),
         height=height,
     )
 
-    # Generate self-contained HTML with the correct matching Plotly.js from CDN
-    base_html = fig.to_html(include_plotlyjs='cdn', full_html=True,
+    base_html = fig.to_html(include_plotlyjs=True, full_html=True,
                             default_height=f'{height}px', default_width='100%')
 
-    rescale_js = """
-<script>
-(function() {
-  function toMs(v) {
-    if (typeof v === 'number') return v;
-    var d = new Date(v); return isNaN(d) ? null : d.getTime();
+    rescale_js = """<script>
+(function(){
+  function toMs(v){
+    if(typeof v==='number') return v;
+    var d=new Date(v); return isNaN(d.getTime())?null:d.getTime();
   }
-  function attachRescale(gd) {
-    var busy = false;
-    gd.on('plotly_relayout', function(ed) {
-      if (busy) return;
-      var xChanged = ed['xaxis.range[0]']  !== undefined ||
-                     ed['xaxis2.range[0]'] !== undefined ||
-                     ed['xaxis.range']     !== undefined;
-      if (!xChanged) return;
-      var layout = gd.layout;
-      if (!layout.xaxis || !layout.xaxis.range) return;
-      var xlo = toMs(layout.xaxis.range[0]);
-      var xhi = toMs(layout.xaxis.range[1]);
-      if (xlo === null || xhi === null) return;
+  function attach(gd){
+    var busy=false;
+    gd.on('plotly_relayout',function(ed){
+      if(busy) return;
+      if(ed['xaxis.autorange']===true || ed['xaxis2.autorange']===true) return;
+      var changed = 'xaxis.range[0]' in ed || 'xaxis2.range[0]' in ed || 'xaxis.range' in ed;
+      if(!changed) return;
+      var layout=gd.layout;
+      if(!layout.xaxis||!layout.xaxis.range) return;
+      var xlo=toMs(layout.xaxis.range[0]), xhi=toMs(layout.xaxis.range[1]);
+      if(xlo===null||xhi===null) return;
       var y1lo=Infinity,y1hi=-Infinity,y2lo=Infinity,y2hi=-Infinity;
-      gd.data.forEach(function(t) {
-        if (!t.x || !t.y || t.hoverinfo === 'skip') return;
-        var isY2 = t.yaxis === 'y2';
-        for (var i=0; i<t.x.length; i++) {
-          if (t.x[i]===null) continue;
+      gd.data.forEach(function(t){
+        if(!t.x||!t.y||t.hoverinfo==='skip') return;
+        var isY2=(t.yaxis==='y2');
+        for(var i=0;i<t.x.length;i++){
+          if(t.x[i]===null) continue;
           var tx=toMs(t.x[i]); if(tx===null||tx<xlo||tx>xhi) continue;
-          var ty=t.y[i]; if(ty===null||ty===undefined||isNaN(ty)) continue;
+          var ty=t.y[i]; if(ty===null||ty===undefined||isNaN(Number(ty))) continue;
+          ty=Number(ty);
           if(isY2){if(ty<y2lo)y2lo=ty;if(ty>y2hi)y2hi=ty;}
           else    {if(ty<y1lo)y1lo=ty;if(ty>y1hi)y1hi=ty;}
         }
       });
       var upd={};
-      if(y1lo!==Infinity){var p=(y1hi-y1lo)*0.05||Math.abs(y1lo)*0.05||1;upd['yaxis.range']=[y1lo-p,y1hi+p];upd['yaxis.autorange']=false;}
-      if(y2lo!==Infinity){var p=(y2hi-y2lo)*0.05||Math.abs(y2lo)*0.05||1;upd['yaxis2.range']=[y2lo-p,y2hi+p];upd['yaxis2.autorange']=false;}
+      if(isFinite(y1lo)){var p=(y1hi-y1lo)*0.05||Math.abs(y1lo)*0.05||1;upd['yaxis.range']=[y1lo-p,y1hi+p];}
+      if(isFinite(y2lo)){var p=(y2hi-y2lo)*0.05||Math.abs(y2lo)*0.05||1;upd['yaxis2.range']=[y2lo-p,y2hi+p];}
       if(Object.keys(upd).length){busy=true;Plotly.relayout(gd,upd).then(function(){busy=false;});}
     });
   }
-  function tryAttach() {
-    var plots = document.querySelectorAll('.js-plotly-plot');
-    if (plots.length > 0) { attachRescale(plots[0]); }
-    else { setTimeout(tryAttach, 200); }
+  function tryAttach(){
+    var plots=document.querySelectorAll('.js-plotly-plot');
+    if(plots.length){attach(plots[0]);}else{setTimeout(tryAttach,300);}
   }
   tryAttach();
 })();
 </script>"""
 
     html = base_html.replace('</body>', rescale_js + '\n</body>')
-    components.html(html, height=height + 30, scrolling=False)
+    components.html(html, height=height + 40, scrolling=False)
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
