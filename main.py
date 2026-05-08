@@ -62,7 +62,9 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
     save_fundamentals_csv(fund_df, run_dir / 'fundamentals.csv')
 
     if save_plots:
-        plot_correlation_matrix(corr_matrix,
+        # Slice to top N by market cap for a legible heatmap
+        top_t = [t for t in tickers if t in corr_matrix.columns][:TOP_N_HIGHLIGHT]
+        plot_correlation_matrix(corr_matrix.loc[top_t, top_t],
                                 save_path=corr_dir / 'correlation_matrix.png')
 
         # General/ — price series highlighted by market cap

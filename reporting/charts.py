@@ -25,7 +25,8 @@ def plot_correlation_matrix(corr_matrix, save_path=None):
             color = 'black' if 0.3 < abs(val) < 0.8 else 'white'
             ax.text(j, i, f'{val:.2f}', ha='center', va='center', fontsize=7, color=color)
 
-    ax.set_title('Correlation Matrix — S&P 500', fontsize=14, pad=16)
+    ax.set_title(f'Correlation Matrix — Top {n} S&P 500 companies by market cap',
+                 fontsize=14, pad=16)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
