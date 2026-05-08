@@ -643,6 +643,45 @@ with tab_corr:
             st.subheader('Correlation Matrix')
             st.image(str(matrix_path), use_container_width=True)
             st.divider()
-
-        if not matrix_path.exists():
+        else:
             st.info('No plots found in Correlation_method/ for this run.')
+
+        # ── Interactive price series for correlation matrix companies ──────────
+        prices_path_c  = run_dir / 'prices.csv'
+        signals_path_c = run_dir / 'signals.csv'
+        if prices_path_c.exists() and signals_path_c.exists():
+            prices_c = _load_csv(str(prices_path_c), index_col=0, parse_dates=True)
+            sdf_c    = _load_csv(str(signals_path_c))
+            nm_c     = (dict(zip(sdf_c['ticker'], sdf_c['company_name']))
+                        if 'company_name' in sdf_c.columns else {})
+
+            # Same tickers as the correlation heatmap (top N by market cap)
+            mcap_col_c = 'market_cap_B' if 'market_cap_B' in sdf_c.columns else None
+            if mcap_col_c:
+                corr_tickers = (sdf_c.dropna(subset=[mcap_col_c])
+                                     .sort_values(mcap_col_c, ascending=False)['ticker']
+                                     .head(TOP_N_HIGHLIGHT).tolist())
+            else:
+                corr_tickers = list(prices_c.columns)[:TOP_N_HIGHLIGHT]
+            corr_tickers = [t for t in corr_tickers if t in prices_c.columns]
+
+            # Multiselect: display as "Company Name (TICKER)", default = first 5
+            opt_map = {f"{nm_c.get(t, t)} ({t})": t for t in corr_tickers}
+            selected_labels = st.multiselect(
+                'Select companies to plot',
+                options=list(opt_map.keys()),
+                default=list(opt_map.keys())[:5],
+            )
+            selected_t = [opt_map[lbl] for lbl in selected_labels]
+
+            if selected_t:
+                _echarts_dual_chart(
+                    prices_c, selected_t, nm_c,
+                    norm_fn=lambda s: s / s.iloc[0] * 100,
+                    abs_fn=lambda s: s,
+                    title='Price Series — Selected Companies',
+                    y1_label='Normalized (base=100)',
+                    y2_label='Close price ($)',
+                )
+            else:
+                st.info('Select at least one company above to display the chart.')
