@@ -138,6 +138,81 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
     components.html(full_html, height=height + 30, scrolling=False)
 
 
+def _show_with_yrescale(fig, height: int = 920):
+    """Render a Plotly figure with y-axis auto-rescaling when x range changes.
+
+    Uses a plotly_relayout JS listener to recalculate y bounds from visible
+    data — necessary because Plotly does not natively rescale y on x-zoom
+    without a Dash callback.
+    Skips background (hoverinfo='skip') traces to avoid distorting the scale.
+    """
+    fig_json = fig.to_json()
+
+    html = f"""<html><head>
+    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+    </head>
+    <body style="margin:0;padding:0;">
+    <div id="chart" style="width:100%;height:{height}px;"></div>
+    <script>
+      const figData = {fig_json};
+      Plotly.newPlot('chart', figData.data, figData.layout, {{responsive:true}});
+
+      const gd = document.getElementById('chart');
+      let _busy = false;
+
+      gd.on('plotly_relayout', function(ed) {{
+        if (_busy) return;
+        const xChanged = ed['xaxis.range[0]']  !== undefined ||
+                         ed['xaxis2.range[0]'] !== undefined ||
+                         ed['xaxis.range']     !== undefined;
+        if (!xChanged) return;
+
+        const layout = gd.layout;
+        const r0 = layout.xaxis && layout.xaxis.range ? layout.xaxis.range[0] : null;
+        const r1 = layout.xaxis && layout.xaxis.range ? layout.xaxis.range[1] : null;
+        if (!r0 || !r1) return;
+
+        const xlo = new Date(r0).getTime();
+        const xhi = new Date(r1).getTime();
+
+        let y1lo=Infinity, y1hi=-Infinity, y2lo=Infinity, y2hi=-Infinity;
+
+        gd.data.forEach(function(trace) {{
+          if (!trace.x || !trace.y) return;
+          if (trace.hoverinfo === 'skip') return;   // skip gray background traces
+          const isY2 = trace.yaxis === 'y2';
+          for (let i=0; i<trace.x.length; i++) {{
+            if (trace.x[i] === null) continue;
+            const tx = new Date(trace.x[i]).getTime();
+            if (tx < xlo || tx > xhi) continue;
+            const ty = trace.y[i];
+            if (ty === null || ty === undefined || isNaN(ty)) continue;
+            if (isY2) {{ if(ty<y2lo) y2lo=ty; if(ty>y2hi) y2hi=ty; }}
+            else       {{ if(ty<y1lo) y1lo=ty; if(ty>y1hi) y1hi=ty; }}
+          }}
+        }});
+
+        const upd = {{}};
+        if (y1lo !== Infinity) {{
+          const p = (y1hi-y1lo)*0.05 || Math.abs(y1lo)*0.05 || 1;
+          upd['yaxis.range']  = [y1lo-p, y1hi+p];
+          upd['yaxis.autorange'] = false;
+        }}
+        if (y2lo !== Infinity) {{
+          const p = (y2hi-y2lo)*0.05 || Math.abs(y2lo)*0.05 || 1;
+          upd['yaxis2.range'] = [y2lo-p, y2hi+p];
+          upd['yaxis2.autorange'] = false;
+        }}
+        if (Object.keys(upd).length) {{
+          _busy = true;
+          Plotly.relayout(gd, upd).then(function(){{ _busy=false; }});
+        }}
+      }});
+    </script>
+    </body></html>"""
+
+    components.html(html, height=height + 10, scrolling=False)
+
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_returns, tab_corr = st.tabs([
@@ -382,11 +457,11 @@ with tab_mcap:
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap')
                     with st.spinner('Rendering chart...'):
-                        st.plotly_chart(_mcap_chart(by_abs,  f'Top {TOP_N_HIGHLIGHT} by Current Market Cap'),  use_container_width=True)
+                        _show_with_yrescale(_mcap_chart(by_abs,  f'Top {TOP_N_HIGHLIGHT} by Current Market Cap'))
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth')
                     with st.spinner('Rendering chart...'):
-                        st.plotly_chart(_mcap_chart(by_norm, f'Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth'), use_container_width=True)
+                        _show_with_yrescale(_mcap_chart(by_norm, f'Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth'))
         else:
             st.info('Required columns missing in signals.csv.')
 
@@ -477,7 +552,7 @@ with tab_prices:
             (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return'),
         ]:
             st.subheader(title)
-            st.plotly_chart(_series_chart(ordering, title), use_container_width=True)
+            _show_with_yrescale(_series_chart(ordering, title))
             st.divider()
     else:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
@@ -550,11 +625,11 @@ with tab_volume:
 
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
         with st.spinner('Rendering chart...'):
-            st.plotly_chart(_volume_chart(by_abs_v,  f'Top {TOP_N_HIGHLIGHT} by Average Volume'),  use_container_width=True)
+            _show_with_yrescale(_volume_chart(by_abs_v,  f'Top {TOP_N_HIGHLIGHT} by Average Volume'))
         st.divider()
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth')
         with st.spinner('Rendering chart...'):
-            st.plotly_chart(_volume_chart(by_norm_v, f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth'), use_container_width=True)
+            _show_with_yrescale(_volume_chart(by_norm_v, f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth'))
 
 
 # ── Tab 6: Cumulative Returns ─────────────────────────────────────────────────
@@ -631,7 +706,7 @@ with tab_returns:
         fig_r.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
 
         with st.spinner('Rendering chart...'):
-            st.plotly_chart(fig_r, use_container_width=True)
+            _show_with_yrescale(fig_r)
 
 
 # ── Tab 7: Correlation Analysis ───────────────────────────────────────────────
