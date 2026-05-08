@@ -283,9 +283,11 @@ opt.tooltip = {{
   confine: true,
   formatter: function(p) {{
     if(!p.data || p.data[1]===null) return '';
+    if(p.seriesName.startsWith('__bg')) return '';
     var company = nm[p.seriesName] || p.seriesName;
+    var val = parseFloat(p.data[1]).toFixed(2);
     return '<b>' + company + '</b> (' + p.seriesName + ')<br/>' +
-           p.data[0] + '<br/>' + parseFloat(p.data[1]).toFixed(2);
+           p.data[0] + '<br/>' + val;
   }}
 }};
 
