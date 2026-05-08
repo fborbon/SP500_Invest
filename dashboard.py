@@ -73,7 +73,7 @@ with tab_signals:
             }
             return colours.get(val, '')
 
-        styled = df.style.applymap(_colour_signal, subset=['signal'])
+        styled = df.style.map(_colour_signal, subset=['signal'])
         st.dataframe(styled, use_container_width=True, height=600)
 
 
@@ -104,7 +104,7 @@ with tab_fund:
             except Exception:
                 return ''
 
-        styled = df.style.applymap(_colour_likelihood, subset=['likelihood_pct']) \
+        styled = df.style.map(_colour_likelihood, subset=['likelihood_pct']) \
                          if 'likelihood_pct' in df.columns else df.style
         st.dataframe(styled, use_container_width=True, height=600)
 
