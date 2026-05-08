@@ -133,10 +133,11 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_signals, tab_fund, tab_prices, tab_corr = st.tabs([
+tab_signals, tab_fund, tab_mcap, tab_prices, tab_corr = st.tabs([
     '📋 Signals',
     '🏦 Fundamentals',
-    '📊 Price Series & Market Cap',
+    '📊 Market Cap',
+    '📈 Price Series',
     '🔗 Correlation Analysis',
 ])
 
@@ -239,13 +240,12 @@ with tab_fund:
         st.caption('🟢 ≥70%  🟡 ≥50%  🔴 <50%  likelihood of price increase in 12 months')
 
 
-# ── Tab 3: Price Series & Market Cap ─────────────────────────────────────────
-with tab_prices:
-    gen_dir      = run_dir / 'General'
+# ── Tab 3: Market Cap ────────────────────────────────────────────────────────
+with tab_mcap:
     signals_path = run_dir / 'signals.csv'
-
-    # ── Interactive market cap bars ───────────────────────────────────────────
-    if signals_path.exists():
+    if not signals_path.exists():
+        st.info('signals.csv not found for this run.')
+    else:
         sdf = pd.read_csv(signals_path)
         if {'ticker', 'company_name', 'current_price', 'market_cap_B', 'sector'}.issubset(sdf.columns):
             sdf = sdf.dropna(subset=['market_cap_B']).sort_values('market_cap_B', ascending=False)
@@ -289,10 +289,14 @@ with tab_prices:
             fig.update_yaxes(title_text='Market Cap ($B)', row=2, col=1)
             st.subheader('Market Cap Bars (interactive — hover for company name)')
             st.plotly_chart(fig, use_container_width=True)
-            st.divider()
+        else:
+            st.info('Required columns missing in signals.csv.')
 
-    # ── Interactive price series ──────────────────────────────────────────────
-    prices_path = run_dir / 'prices.csv'
+
+# ── Tab 4: Price Series ───────────────────────────────────────────────────────
+with tab_prices:
+    signals_path = run_dir / 'signals.csv'
+    prices_path  = run_dir / 'prices.csv'
     if prices_path.exists() and signals_path.exists():
         prices_df = pd.read_csv(prices_path, index_col=0, parse_dates=True)
         sdf_full  = pd.read_csv(signals_path)
@@ -380,7 +384,7 @@ with tab_prices:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
 
 
-# ── Tab 4: Correlation Analysis ───────────────────────────────────────────────
+# ── Tab 5: Correlation Analysis ───────────────────────────────────────────────
 with tab_corr:
     if not corr_dir.exists():
         st.info('No Correlation_method/ plots found for this run.')
