@@ -297,12 +297,13 @@ with tab_mcap:
                 nm = dict(zip(sdf['ticker'], sdf['company_name']))
 
                 # Approximate historical market cap: price × (current_mcap / current_price)
-                mcap_df = pd.DataFrame(index=prices_df.index)
+                mcap_series = {}
                 for _, r in sdf.iterrows():
                     t = r['ticker']
                     if t in prices_df.columns and r['current_price'] > 0:
                         shares = r['market_cap_B'] / r['current_price']
-                        mcap_df[t] = prices_df[t] * shares
+                        mcap_series[t] = prices_df[t] * shares
+                mcap_df = pd.DataFrame(mcap_series)
 
                 if not mcap_df.empty:
                     ordered_t = [t for t in sdf['ticker'] if t in mcap_df.columns]
@@ -368,7 +369,8 @@ with tab_mcap:
                     )
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} highlighted')
-                    st.plotly_chart(fig_ts, use_container_width=True)
+                    with st.spinner('Rendering chart...'):
+                        st.plotly_chart(fig_ts, use_container_width=True)
         else:
             st.info('Required columns missing in signals.csv.')
 
