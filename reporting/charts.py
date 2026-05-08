@@ -15,6 +15,15 @@ COLORS = [
 
 _EXPORT = dict(width=1800, height=1200, scale=2)
 
+# Max data points per trace for PNG export — prevents kaleido timeout on long histories
+_MAX_BG_PTS = 200   # background (gray) traces
+_MAX_FG_PTS = 800   # foreground (colored) traces
+
+
+def _step(n: int, max_pts: int) -> int:
+    """Downsample step so that n points become at most max_pts."""
+    return max(1, n // max_pts)
+
 
 def _save(fig, path):
     pio.write_image(fig, str(path), **_EXPORT)
@@ -65,12 +74,16 @@ def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
                         subplot_titles=['Normalized price (base = 100)', 'Close price ($)'])
 
+    n      = len(prices_df)
+    bg_s   = _step(n, _MAX_BG_PTS)
+    fg_s   = _step(n, _MAX_FG_PTS)
+
     x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
     for t in prices_df.columns:
         if t not in top_t:
             nv = prices_df[t] / prices_df[t].iloc[0] * 100
-            x_bg_n.extend(_dt(prices_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-            x_bg_a.extend(_dt(prices_df.index) + [None]); y_bg_a.extend(list(prices_df[t]) + [None])
+            x_bg_n.extend(_dt(prices_df.index[::bg_s]) + [None]); y_bg_n.extend(list(nv.iloc[::bg_s]) + [None])
+            x_bg_a.extend(_dt(prices_df.index[::bg_s]) + [None]); y_bg_a.extend(list(prices_df[t].iloc[::bg_s]) + [None])
     if x_bg_n:
         for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
             fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -80,9 +93,9 @@ def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='
     for i, t in enumerate(top_t):
         nv    = prices_df[t] / prices_df[t].iloc[0] * 100
         color = COLORS[i % len(COLORS)]
-        fig.add_trace(go.Scatter(x=_dt(prices_df.index), y=nv, mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(prices_df.index[::fg_s]), y=nv.iloc[::fg_s], mode='lines', name=t,
                                   line=dict(color=color, width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=_dt(prices_df.index), y=prices_df[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(prices_df.index[::fg_s]), y=prices_df[t].iloc[::fg_s], mode='lines', name=t,
                                   line=dict(color=color, width=1.5),
                                   showlegend=False), row=2, col=1)
 
@@ -147,15 +160,18 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
     by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
     def _plot(ordered, save_path, label):
-        top_t = ordered[:top_n]
+        top_t  = ordered[:top_n]
+        nm     = len(mcap_df)
+        bg_s   = _step(nm, _MAX_BG_PTS)
+        fg_s   = _step(nm, _MAX_FG_PTS)
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
                             subplot_titles=['Normalized market cap (base = 100)', 'Market cap ($B)'])
         x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
         for t in mcap_df.columns:
             if t not in top_t:
                 nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                x_bg_n.extend(_dt(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                x_bg_a.extend(_dt(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
+                x_bg_n.extend(_dt(mcap_df.index[::bg_s]) + [None]); y_bg_n.extend(list(nv.iloc[::bg_s]) + [None])
+                x_bg_a.extend(_dt(mcap_df.index[::bg_s]) + [None]); y_bg_a.extend(list(mcap_df[t].iloc[::bg_s]) + [None])
         if x_bg_n:
             for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                 fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -164,9 +180,9 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
         for i, t in enumerate(top_t):
             nv    = mcap_df[t] / mcap_df[t].iloc[0] * 100
             color = COLORS[i % len(COLORS)]
-            fig.add_trace(go.Scatter(x=_dt(mcap_df.index), y=nv, mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(mcap_df.index[::fg_s]), y=nv.iloc[::fg_s], mode='lines', name=t,
                                       line=dict(color=color, width=1.5)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=_dt(mcap_df.index), y=mcap_df[t], mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(mcap_df.index[::fg_s]), y=mcap_df[t].iloc[::fg_s], mode='lines', name=t,
                                       line=dict(color=color, width=1.5),
                                       showlegend=False), row=2, col=1)
         fig.update_layout(
@@ -191,7 +207,10 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
     by_norm = (volume_df.iloc[-1] / volume_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
     def _plot(ordered, save_path, label):
-        top_t = [t for t in ordered if t in volume_df.columns][:top_n]
+        top_t  = [t for t in ordered if t in volume_df.columns][:top_n]
+        nv_len = len(volume_df)
+        bg_s   = _step(nv_len, _MAX_BG_PTS)
+        fg_s   = _step(nv_len, _MAX_FG_PTS)
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
                             subplot_titles=['Normalized volume (base = 100)', 'Volume (shares)'])
         x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
@@ -199,8 +218,8 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
             if t not in top_t:
                 first = volume_df[t].replace(0, float('nan')).first_valid_index()
                 nv = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
-                x_bg_n.extend(_dt(volume_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                x_bg_a.extend(_dt(volume_df.index) + [None]); y_bg_a.extend(list(volume_df[t]) + [None])
+                x_bg_n.extend(_dt(volume_df.index[::bg_s]) + [None]); y_bg_n.extend(list(nv.iloc[::bg_s]) + [None])
+                x_bg_a.extend(_dt(volume_df.index[::bg_s]) + [None]); y_bg_a.extend(list(volume_df[t].iloc[::bg_s]) + [None])
         if x_bg_n:
             for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                 fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -210,9 +229,9 @@ def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
             first = volume_df[t].replace(0, float('nan')).first_valid_index()
             nv    = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
             color = COLORS[i % len(COLORS)]
-            fig.add_trace(go.Scatter(x=_dt(volume_df.index), y=nv, mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(volume_df.index[::fg_s]), y=nv.iloc[::fg_s], mode='lines', name=t,
                                       line=dict(color=color, width=1.5)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=_dt(volume_df.index), y=volume_df[t], mode='lines', name=t,
+            fig.add_trace(go.Scatter(x=_dt(volume_df.index[::fg_s]), y=volume_df[t].iloc[::fg_s], mode='lines', name=t,
                                       line=dict(color=color, width=1.5),
                                       showlegend=False), row=2, col=1)
         fig.update_layout(
@@ -239,11 +258,15 @@ def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
                         subplot_titles=['Cumulative return (%)', 'Dollar return ($ per share)'])
 
+    n    = len(prices_df)
+    bg_s = _step(n, _MAX_BG_PTS)
+    fg_s = _step(n, _MAX_FG_PTS)
+
     x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
     for t in prices_df.columns:
         if t not in top_t:
-            x_bg_p.extend(_dt(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
-            x_bg_u.extend(_dt(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
+            x_bg_p.extend(_dt(cum_pct.index[::bg_s]) + [None]); y_bg_p.extend(list(cum_pct[t].iloc[::bg_s]) + [None])
+            x_bg_u.extend(_dt(cum_usd.index[::bg_s]) + [None]); y_bg_u.extend(list(cum_usd[t].iloc[::bg_s]) + [None])
     if x_bg_p:
         for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
             fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -252,9 +275,9 @@ def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
 
     for i, t in enumerate(top_t):
         color = COLORS[i % len(COLORS)]
-        fig.add_trace(go.Scatter(x=_dt(cum_pct.index), y=cum_pct[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(cum_pct.index[::fg_s]), y=cum_pct[t].iloc[::fg_s], mode='lines', name=t,
                                   line=dict(color=color, width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=_dt(cum_usd.index), y=cum_usd[t], mode='lines', name=t,
+        fig.add_trace(go.Scatter(x=_dt(cum_usd.index[::fg_s]), y=cum_usd[t].iloc[::fg_s], mode='lines', name=t,
                                   line=dict(color=color, width=1.5),
                                   showlegend=False), row=2, col=1)
 
