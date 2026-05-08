@@ -141,77 +141,71 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 def _show_with_yrescale(fig, height: int = 920):
     """Render a Plotly figure with y-axis auto-rescaling when x range changes.
 
-    Uses a plotly_relayout JS listener to recalculate y bounds from visible
-    data — necessary because Plotly does not natively rescale y on x-zoom
-    without a Dash callback.
-    Skips background (hoverinfo='skip') traces to avoid distorting the scale.
+    Uses fig.to_html(include_plotlyjs='cdn') so the correct Plotly.js version
+    is loaded, then injects a plotly_relayout listener for y-axis rescaling.
+    The legend is moved inside the chart to avoid clipping in the fixed iframe.
     """
-    fig_json = fig.to_json()
+    # Move legend inside chart top-right to avoid clipping in the iframe
+    fig.update_layout(
+        legend=dict(orientation='h', yanchor='top', y=0.99, xanchor='right', x=1,
+                    bgcolor='rgba(255,255,255,0.7)', borderwidth=0),
+        margin=dict(t=60, r=10, b=10, l=10),
+        height=height,
+    )
 
-    html = f"""<html><head>
-    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-    </head>
-    <body style="margin:0;padding:0;">
-    <div id="chart" style="width:100%;height:{height}px;"></div>
-    <script>
-      const figData = {fig_json};
-      Plotly.newPlot('chart', figData.data, figData.layout, {{responsive:true}});
+    # Generate self-contained HTML with the correct matching Plotly.js from CDN
+    base_html = fig.to_html(include_plotlyjs='cdn', full_html=True,
+                            default_height=f'{height}px', default_width='100%')
 
-      const gd = document.getElementById('chart');
-      let _busy = false;
+    rescale_js = """
+<script>
+(function() {
+  function toMs(v) {
+    if (typeof v === 'number') return v;
+    var d = new Date(v); return isNaN(d) ? null : d.getTime();
+  }
+  function attachRescale(gd) {
+    var busy = false;
+    gd.on('plotly_relayout', function(ed) {
+      if (busy) return;
+      var xChanged = ed['xaxis.range[0]']  !== undefined ||
+                     ed['xaxis2.range[0]'] !== undefined ||
+                     ed['xaxis.range']     !== undefined;
+      if (!xChanged) return;
+      var layout = gd.layout;
+      if (!layout.xaxis || !layout.xaxis.range) return;
+      var xlo = toMs(layout.xaxis.range[0]);
+      var xhi = toMs(layout.xaxis.range[1]);
+      if (xlo === null || xhi === null) return;
+      var y1lo=Infinity,y1hi=-Infinity,y2lo=Infinity,y2hi=-Infinity;
+      gd.data.forEach(function(t) {
+        if (!t.x || !t.y || t.hoverinfo === 'skip') return;
+        var isY2 = t.yaxis === 'y2';
+        for (var i=0; i<t.x.length; i++) {
+          if (t.x[i]===null) continue;
+          var tx=toMs(t.x[i]); if(tx===null||tx<xlo||tx>xhi) continue;
+          var ty=t.y[i]; if(ty===null||ty===undefined||isNaN(ty)) continue;
+          if(isY2){if(ty<y2lo)y2lo=ty;if(ty>y2hi)y2hi=ty;}
+          else    {if(ty<y1lo)y1lo=ty;if(ty>y1hi)y1hi=ty;}
+        }
+      });
+      var upd={};
+      if(y1lo!==Infinity){var p=(y1hi-y1lo)*0.05||Math.abs(y1lo)*0.05||1;upd['yaxis.range']=[y1lo-p,y1hi+p];upd['yaxis.autorange']=false;}
+      if(y2lo!==Infinity){var p=(y2hi-y2lo)*0.05||Math.abs(y2lo)*0.05||1;upd['yaxis2.range']=[y2lo-p,y2hi+p];upd['yaxis2.autorange']=false;}
+      if(Object.keys(upd).length){busy=true;Plotly.relayout(gd,upd).then(function(){busy=false;});}
+    });
+  }
+  function tryAttach() {
+    var plots = document.querySelectorAll('.js-plotly-plot');
+    if (plots.length > 0) { attachRescale(plots[0]); }
+    else { setTimeout(tryAttach, 200); }
+  }
+  tryAttach();
+})();
+</script>"""
 
-      gd.on('plotly_relayout', function(ed) {{
-        if (_busy) return;
-        const xChanged = ed['xaxis.range[0]']  !== undefined ||
-                         ed['xaxis2.range[0]'] !== undefined ||
-                         ed['xaxis.range']     !== undefined;
-        if (!xChanged) return;
-
-        const layout = gd.layout;
-        const r0 = layout.xaxis && layout.xaxis.range ? layout.xaxis.range[0] : null;
-        const r1 = layout.xaxis && layout.xaxis.range ? layout.xaxis.range[1] : null;
-        if (!r0 || !r1) return;
-
-        const xlo = new Date(r0).getTime();
-        const xhi = new Date(r1).getTime();
-
-        let y1lo=Infinity, y1hi=-Infinity, y2lo=Infinity, y2hi=-Infinity;
-
-        gd.data.forEach(function(trace) {{
-          if (!trace.x || !trace.y) return;
-          if (trace.hoverinfo === 'skip') return;   // skip gray background traces
-          const isY2 = trace.yaxis === 'y2';
-          for (let i=0; i<trace.x.length; i++) {{
-            if (trace.x[i] === null) continue;
-            const tx = new Date(trace.x[i]).getTime();
-            if (tx < xlo || tx > xhi) continue;
-            const ty = trace.y[i];
-            if (ty === null || ty === undefined || isNaN(ty)) continue;
-            if (isY2) {{ if(ty<y2lo) y2lo=ty; if(ty>y2hi) y2hi=ty; }}
-            else       {{ if(ty<y1lo) y1lo=ty; if(ty>y1hi) y1hi=ty; }}
-          }}
-        }});
-
-        const upd = {{}};
-        if (y1lo !== Infinity) {{
-          const p = (y1hi-y1lo)*0.05 || Math.abs(y1lo)*0.05 || 1;
-          upd['yaxis.range']  = [y1lo-p, y1hi+p];
-          upd['yaxis.autorange'] = false;
-        }}
-        if (y2lo !== Infinity) {{
-          const p = (y2hi-y2lo)*0.05 || Math.abs(y2lo)*0.05 || 1;
-          upd['yaxis2.range'] = [y2lo-p, y2hi+p];
-          upd['yaxis2.autorange'] = false;
-        }}
-        if (Object.keys(upd).length) {{
-          _busy = true;
-          Plotly.relayout(gd, upd).then(function(){{ _busy=false; }});
-        }}
-      }});
-    </script>
-    </body></html>"""
-
-    components.html(html, height=height + 10, scrolling=False)
+    html = base_html.replace('</body>', rescale_js + '\n</body>')
+    components.html(html, height=height + 30, scrolling=False)
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
