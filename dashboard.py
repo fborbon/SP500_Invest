@@ -341,13 +341,24 @@ with tab_prices:
                 ), row=2, col=1)
 
             fig.update_layout(
-                title=title, height=820,
+                title=title, height=860,
                 hovermode='closest',
                 legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
             )
             fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
             fig.update_yaxes(title_text='Close price ($)',        row=2, col=1)
             fig.update_xaxes(title_text='Date',                   row=2, col=1)
+            fig.update_xaxes(
+                rangeselector=dict(buttons=[
+                    dict(count=1,  label='1M',  step='month', stepmode='backward'),
+                    dict(count=3,  label='3M',  step='month', stepmode='backward'),
+                    dict(count=6,  label='6M',  step='month', stepmode='backward'),
+                    dict(count=1,  label='YTD', step='year',  stepmode='todate'),
+                    dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
+                    dict(step='all', label='All'),
+                ]),
+                row=1, col=1,
+            )
             return fig
 
         mcap_col = 'market_cap_B' if 'market_cap_B' in sdf_full.columns else None
