@@ -306,71 +306,77 @@ with tab_mcap:
                 mcap_df = pd.DataFrame(mcap_series)
 
                 if not mcap_df.empty:
-                    ordered_t = [t for t in sdf['ticker'] if t in mcap_df.columns]
-                    top_t     = ordered_t[:TOP_N_HIGHLIGHT]
-
                     COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
                               '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
                               '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
 
-                    fig_ts = make_subplots(
-                        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                        subplot_titles=['Normalized market cap (base = 100)', 'Market cap ($B)'],
-                    )
+                    def _mcap_chart(top_t, title):
+                        fig_ts = make_subplots(
+                            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                            subplot_titles=['Normalized market cap (base = 100)', 'Market cap ($B)'],
+                        )
+                        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+                        for t in mcap_df.columns:
+                            if t not in top_t:
+                                nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
+                                x_bg_n.extend(list(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                                x_bg_a.extend(list(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
+                        if x_bg_n:
+                            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                                fig_ts.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                                             line=dict(color='lightgray', width=0.5),
+                                                             showlegend=False, hoverinfo='skip'),
+                                                 row=rn, col=1)
+                        for i, t in enumerate(top_t):
+                            company = nm.get(t, t)
+                            nv      = mcap_df[t] / mcap_df[t].iloc[0] * 100
+                            color   = COLORS[i % len(COLORS)]
+                            fig_ts.add_trace(go.Scatter(
+                                x=mcap_df.index, y=nv, mode='lines', name=t,
+                                line=dict(color=color, width=1.8),
+                                hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                                               '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
+                            ), row=1, col=1)
+                            fig_ts.add_trace(go.Scatter(
+                                x=mcap_df.index, y=mcap_df[t], mode='lines', name=t,
+                                line=dict(color=color, width=1.8), showlegend=False,
+                                hovertemplate=(f'<b>{company}</b> ({t})<br>'
+                                               '%{x|%Y-%m-%d}<br>Cap ($B): %{y:,.1f}<extra></extra>'),
+                            ), row=2, col=1)
+                        fig_ts.update_layout(
+                            title=title, height=860, hovermode='closest',
+                            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                        )
+                        fig_ts.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+                        fig_ts.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1)
+                        fig_ts.update_xaxes(title_text='Date',                   row=2, col=1)
+                        fig_ts.update_xaxes(
+                            rangeselector=dict(buttons=[
+                                dict(count=1,  label='1M',  step='month', stepmode='backward'),
+                                dict(count=3,  label='3M',  step='month', stepmode='backward'),
+                                dict(count=6,  label='6M',  step='month', stepmode='backward'),
+                                dict(count=1,  label='YTD', step='year',  stepmode='todate'),
+                                dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
+                                dict(step='all', label='All'),
+                            ]),
+                            row=1, col=1,
+                        )
+                        return fig_ts
 
-                    x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
-                    for t in mcap_df.columns:
-                        if t not in top_t:
-                            nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                            x_bg_n.extend(list(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                            x_bg_a.extend(list(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
-                    if x_bg_n:
-                        for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
-                            fig_ts.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
-                                                         line=dict(color='lightgray', width=0.5),
-                                                         showlegend=False, hoverinfo='skip'),
-                                             row=rn, col=1)
+                    # Chart 1 — top by current (absolute) market cap
+                    by_abs  = [t for t in sdf['ticker'] if t in mcap_df.columns][:TOP_N_HIGHLIGHT]
+                    # Chart 2 — top by normalized market cap growth (latest / earliest)
+                    by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()
+                    by_norm = by_norm[:TOP_N_HIGHLIGHT]
 
-                    for i, t in enumerate(top_t):
-                        company = nm.get(t, t)
-                        nv      = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                        color   = COLORS[i % len(COLORS)]
-                        fig_ts.add_trace(go.Scatter(
-                            x=mcap_df.index, y=nv, mode='lines', name=t,
-                            line=dict(color=color, width=1.8),
-                            hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                           '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
-                        ), row=1, col=1)
-                        fig_ts.add_trace(go.Scatter(
-                            x=mcap_df.index, y=mcap_df[t], mode='lines', name=t,
-                            line=dict(color=color, width=1.8), showlegend=False,
-                            hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                           '%{x|%Y-%m-%d}<br>Cap ($B): %{y:,.1f}<extra></extra>'),
-                        ), row=2, col=1)
-
-                    fig_ts.update_layout(
-                        title=f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap',
-                        height=860, hovermode='closest',
-                        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                    )
-                    fig_ts.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
-                    fig_ts.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1)
-                    fig_ts.update_xaxes(title_text='Date',                   row=2, col=1)
-                    fig_ts.update_xaxes(
-                        rangeselector=dict(buttons=[
-                            dict(count=1,  label='1M',  step='month', stepmode='backward'),
-                            dict(count=3,  label='3M',  step='month', stepmode='backward'),
-                            dict(count=6,  label='6M',  step='month', stepmode='backward'),
-                            dict(count=1,  label='YTD', step='year',  stepmode='todate'),
-                            dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
-                            dict(step='all', label='All'),
-                        ]),
-                        row=1, col=1,
-                    )
                     st.divider()
-                    st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} highlighted')
+                    st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap')
                     with st.spinner('Rendering chart...'):
-                        st.plotly_chart(fig_ts, use_container_width=True)
+                        st.plotly_chart(_mcap_chart(by_abs,  f'Top {TOP_N_HIGHLIGHT} by Current Market Cap'),  use_container_width=True)
+                    st.divider()
+                    st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth')
+                    with st.spinner('Rendering chart...'):
+                        st.plotly_chart(_mcap_chart(by_norm, f'Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth'), use_container_width=True)
         else:
             st.info('Required columns missing in signals.csv.')
 
