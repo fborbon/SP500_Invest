@@ -54,7 +54,7 @@ PRICE_CACHE_OVERLAP_DAYS  = 15   # calendar days to re-fetch for split/dividend 
 MCAP_CACHE_MAX_AGE_HOURS  = 24   # hours before market-cap snapshot is considered stale
 
 # Model parameters
-HISTORY_DAYS     = 800     # Days of history for correlation calculation
+HISTORY_DAYS     = 99999   # Use all cached history; set lower to limit analysis window
 PREDICTION_DAYS  = 7       # Prediction horizon (days)
 MIN_CORRELATION  = 0.50    # Minimum correlation to use as predictor
 MIN_R2           = 0.01    # Minimum R² to trust the signal. =0.40

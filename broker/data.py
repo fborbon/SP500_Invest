@@ -213,17 +213,47 @@ def _update_ohlcv_cache(cache_path, tickers: list, col: str,
     return result
 
 
+def _fetch_ohlcv_max(tickers: list, col: str) -> pd.DataFrame:
+    """Download full available history (period='max') for the given OHLCV column."""
+    yf_tickers = [t.replace('.', '-') for t in tickers]
+    ticker_map  = dict(zip(yf_tickers, tickers))
+    print(f"\nDownloading full history (period=max) via yfinance — {len(tickers)} tickers...")
+    raw = yf.download(yf_tickers, period='max', interval='1d',
+                      auto_adjust=True, progress=False, threads=True)
+    if raw.empty:
+        return pd.DataFrame()
+    if isinstance(raw.columns, pd.MultiIndex):
+        df = raw[col].rename(columns=ticker_map)
+    else:
+        df = raw[[col]].rename(columns={col: tickers[0]})
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    df.dropna(axis=1, how='all', inplace=True)
+    print(f"  ✓ {len(df.columns)}/{len(tickers)} tickers — {len(df)} trading days "
+          f"({df.index[0].date()} → {df.index[-1].date()})")
+    return df
+
+
+def fetch_prices_max(tickers: list) -> pd.DataFrame:
+    """Download full price history since IPO for all tickers."""
+    return _fetch_ohlcv_max(tickers, 'Close')
+
+
+def fetch_volume_max(tickers: list) -> pd.DataFrame:
+    """Download full volume history since IPO for all tickers."""
+    return _fetch_ohlcv_max(tickers, 'Volume')
+
+
 def fetch_prices_cached(tickers: list) -> pd.DataFrame:
-    """Cached version of fetch_prices_free — only downloads new trading days."""
+    """Cached version — initial download uses period='max'; subsequent runs are incremental."""
     print("\nLoading prices from cache + incremental update...")
     return _update_ohlcv_cache(
-        CACHE_DIR / 'prices_cache.parquet', tickers, 'Close', fetch_prices_free
+        CACHE_DIR / 'prices_cache.parquet', tickers, 'Close', fetch_prices_max
     )
 
 
 def fetch_volume_cached(tickers: list) -> pd.DataFrame:
-    """Cached version of fetch_volume_free — only downloads new trading days."""
+    """Cached version — initial download uses period='max'; subsequent runs are incremental."""
     print("\nLoading volume from cache + incremental update...")
     return _update_ohlcv_cache(
-        CACHE_DIR / 'volume_cache.parquet', tickers, 'Volume', fetch_volume_free
+        CACHE_DIR / 'volume_cache.parquet', tickers, 'Volume', fetch_volume_max
     )
