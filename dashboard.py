@@ -3,6 +3,8 @@ SP500 Correlation Bot — Dashboard
 Run with:  streamlit run dashboard.py --server.headless true
 """
 import base64
+import json
+import math
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -138,81 +140,187 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
     components.html(full_html, height=height + 30, scrolling=False)
 
 
-def _show_with_yrescale(fig, height: int = 920):
-    """Render a Plotly figure with y-axis auto-rescaling when x range changes."""
-    # Legend inside chart (top-left, horizontal) — avoids clipping in iframe
-    fig.update_layout(
-        legend=dict(orientation='h', yanchor='top', y=0.99, xanchor='left', x=0,
-                    bgcolor='rgba(255,255,255,0.6)', font=dict(size=9)),
-        margin=dict(t=50, r=20, b=10, l=60),
-        height=height,
-    )
+_ECHARTS_CDN = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
+_COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+           '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+           '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
 
-    # Switch showlegend traces to lines+markers so legend shows a circle, not a line
-    for trace in fig.data:
-        if getattr(trace, 'showlegend', False) is not False and getattr(trace, 'mode', '') == 'lines':
-            trace.mode = 'lines+markers'
-            trace.marker = dict(symbol='circle', size=5, opacity=0.7)
 
-    base_html = fig.to_html(include_plotlyjs=True, full_html=True,
-                            div_id='plotly-chart',
-                            default_height=f'{height}px', default_width='100%')
+def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
+                        title, y1_label, y2_label, height=880):
+    """Two-subplot ECharts time series with native y-axis auto-scaling on x-zoom.
 
-    legend_css = """<style>
-  /* Hide line segment in Plotly legend — show only the circle marker */
-  g.legendlines path, g.legendlines rect { display: none !important; }
-</style>"""
+    dataZoom filterMode='filter' makes ECharts automatically rescale both
+    y-axes whenever the x range changes — no JavaScript callbacks needed.
+    """
+    def _clean(v):
+        try:
+            f = float(v)
+            return None if (math.isnan(f) or math.isinf(f)) else round(f, 4)
+        except Exception:
+            return None
 
-    rescale_js = """<script>
-(function(){
-  function toMs(v){
-    if(typeof v==='number') return v;
-    var d=new Date(v); return isNaN(d.getTime())?null:d.getTime();
-  }
-  function attach(gd){
-    var busy=false;
-    gd.on('plotly_relayout',function(ed){
-      if(busy) return;
-      var xlo_raw, xhi_raw;
-      if('xaxis.range[0]' in ed){
-        xlo_raw=ed['xaxis.range[0]']; xhi_raw=ed['xaxis.range[1]'];
-      } else if('xaxis2.range[0]' in ed){
-        xlo_raw=ed['xaxis2.range[0]']; xhi_raw=ed['xaxis2.range[1]'];
-      } else if('xaxis.range' in ed){
-        xlo_raw=ed['xaxis.range'][0]; xhi_raw=ed['xaxis.range'][1];
-      } else { return; }
-      var xlo=toMs(xlo_raw), xhi=toMs(xhi_raw);
-      if(xlo===null||xhi===null||xlo>=xhi) return;
-      var y1lo=Infinity,y1hi=-Infinity,y2lo=Infinity,y2hi=-Infinity;
-      gd.data.forEach(function(t){
-        if(!t.x||!t.y||t.hoverinfo==='skip') return;
-        var isY2=(t.yaxis==='y2');
-        for(var i=0;i<t.x.length;i++){
-          if(t.x[i]===null) continue;
-          var tx=toMs(t.x[i]); if(tx===null||tx<xlo||tx>xhi) continue;
-          var ty=Number(t.y[i]); if(isNaN(ty)) continue;
-          if(isY2){if(ty<y2lo)y2lo=ty;if(ty>y2hi)y2hi=ty;}
-          else    {if(ty<y1lo)y1lo=ty;if(ty>y1hi)y1hi=ty;}
-        }
-      });
-      var upd={};
-      if(isFinite(y1lo)){var p=(y1hi-y1lo)*0.05||Math.abs(y1lo)*0.05||1;upd['yaxis.range']=[y1lo-p,y1hi+p];}
-      if(isFinite(y2lo)){var p=(y2hi-y2lo)*0.05||Math.abs(y2lo)*0.05||1;upd['yaxis2.range']=[y2lo-p,y2hi+p];}
-      if(Object.keys(upd).length){busy=true;Plotly.relayout(gd,upd).then(function(){busy=false;});}
-    });
-  }
-  var gd=document.getElementById('plotly-chart');
-  if(gd){
-    // Attach after first render completes
-    gd.on('plotly_afterplot', function(){ attach(gd); });
-    // Fallback: also try immediately in case afterplot already fired
-    if(gd._fullData && gd._fullData.length) attach(gd);
-  }
-})();
-</script>"""
+    top_set = set(top_t)
+    dates     = df_all.index.strftime('%Y-%m-%d').tolist()
+    dates_bg  = dates[::_BG_STEP]
 
-    html = base_html.replace('</head>', legend_css + '\n</head>').replace('</body>', rescale_js + '\n</body>')
-    components.html(html, height=height + 40, scrolling=False)
+    series = []
+
+    # ── Background gray traces (downsampled, not in legend) ──────────────────
+    bg_n, bg_a = [], []
+    for t in df_all.columns:
+        if t in top_set:
+            continue
+        try:
+            nv = norm_fn(df_all[t]).iloc[::_BG_STEP]
+            av = abs_fn(df_all[t]).iloc[::_BG_STEP]
+            for i in range(len(dates_bg)):
+                bg_n.append([dates_bg[i], _clean(nv.iloc[i])])
+                bg_a.append([dates_bg[i], _clean(av.iloc[i])])
+            bg_n.append(None)
+            bg_a.append(None)
+        except Exception:
+            pass
+
+    if bg_n:
+        for subplot, data in [(0, bg_n), (1, bg_a)]:
+            series.append({
+                'name': '__bg__', 'type': 'line',
+                'xAxisIndex': subplot, 'yAxisIndex': subplot,
+                'data': data, 'symbol': 'none', 'silent': True,
+                'lineStyle': {'color': '#ddd', 'width': 0.5},
+                'large': True, 'largeThreshold': 200,
+            })
+
+    # ── Highlighted top-N traces (same name links both subplots in legend) ───
+    for i, t in enumerate(top_t):
+        if t not in df_all.columns:
+            continue
+        color = _COLORS[i % len(_COLORS)]
+        try:
+            nv = norm_fn(df_all[t])
+            av = abs_fn(df_all[t])
+            norm_data = [[dates[j], _clean(nv.iloc[j])] for j in range(len(dates))]
+            abs_data  = [[dates[j], _clean(av.iloc[j])]  for j in range(len(dates))]
+        except Exception:
+            continue
+        series.append({
+            'name': t, 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0,
+            'data': norm_data, 'symbol': 'none',
+            'lineStyle': {'color': color, 'width': 1.8},
+            'itemStyle': {'color': color},
+        })
+        series.append({
+            'name': t, 'type': 'line', 'xAxisIndex': 1, 'yAxisIndex': 1,
+            'data': abs_data, 'symbol': 'none',
+            'lineStyle': {'color': color, 'width': 1.8},
+            'itemStyle': {'color': color},
+        })
+
+    option = {
+        'animation': False,
+        'backgroundColor': '#fff',
+        'title': {'text': title, 'textStyle': {'fontSize': 12, 'fontWeight': 'bold'}, 'top': 2},
+        'legend': {
+            'type': 'scroll', 'top': 28,
+            'data': [{'name': t, 'icon': 'circle'} for t in top_t if t in df_all.columns],
+            'itemWidth': 10, 'itemHeight': 10,
+            'textStyle': {'fontSize': 10},
+        },
+        'axisPointer': {'link': [{'xAxisIndex': 'all'}]},
+        'dataZoom': [
+            {
+                'type': 'slider', 'xAxisIndex': [0, 1],
+                'filterMode': 'filter',   # ← auto-scales y on x zoom
+                'bottom': 5, 'height': 22, 'labelFormatter': '',
+            },
+            {'type': 'inside', 'xAxisIndex': [0, 1], 'filterMode': 'filter'},
+        ],
+        'grid': [
+            {'top': '18%', 'bottom': '52%', 'left': '9%', 'right': '3%'},
+            {'top': '55%', 'bottom': '12%', 'left': '9%', 'right': '3%'},
+        ],
+        'xAxis': [
+            {'type': 'time', 'gridIndex': 0,
+             'axisLabel': {'show': False}, 'splitLine': {'show': False}},
+            {'type': 'time', 'gridIndex': 1,
+             'axisLabel': {'formatter': '{yyyy}-{MM}', 'fontSize': 9}},
+        ],
+        'yAxis': [
+            {'type': 'value', 'gridIndex': 0, 'name': y1_label, 'scale': True,
+             'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
+             'splitLine': {'lineStyle': {'opacity': 0.3}}},
+            {'type': 'value', 'gridIndex': 1, 'name': y2_label, 'scale': True,
+             'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
+             'splitLine': {'lineStyle': {'opacity': 0.3}}},
+        ],
+        'series': series,
+    }
+
+    opt_json  = json.dumps(option)
+    nm_json   = json.dumps({t: nm.get(t, t) for t in top_t})
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="{_ECHARTS_CDN}"></script>
+<style>
+body{{margin:0;padding:0;background:#fff;font-family:sans-serif;}}
+#btns{{padding:4px 8px;}}
+#btns button{{margin:2px;padding:3px 8px;cursor:pointer;border:1px solid #ccc;
+  border-radius:3px;background:#f5f5f5;font-size:11px;}}
+#btns button:hover{{background:#dce8f5;}}
+</style></head>
+<body>
+<div id="btns"></div>
+<div id="chart" style="width:100%;height:{height}px;"></div>
+<script>
+var chart = echarts.init(document.getElementById('chart'),null,{{renderer:'canvas'}});
+var nm = {nm_json};
+var opt = {opt_json};
+
+// Tooltip: show company name + ticker + value for hovered series only
+opt.tooltip = {{
+  trigger: 'item',
+  confine: true,
+  formatter: function(p) {{
+    if(!p.data || p.data[1]===null) return '';
+    var company = nm[p.seriesName] || p.seriesName;
+    return '<b>' + company + '</b> (' + p.seriesName + ')<br/>' +
+           p.data[0] + '<br/>' + parseFloat(p.data[1]).toFixed(2);
+  }}
+}};
+
+chart.setOption(opt);
+window.addEventListener('resize', function(){{ chart.resize(); }});
+
+// Period selector buttons
+var periods = [
+  {{l:'1M',m:1}},{{l:'3M',m:3}},{{l:'6M',m:6}},
+  {{l:'YTD',ytd:true}},{{l:'1Y',m:12}},{{l:'All',all:true}}
+];
+var btnsDiv = document.getElementById('btns');
+periods.forEach(function(p){{
+  var btn = document.createElement('button');
+  btn.innerText = p.l;
+  btn.onclick = function(){{
+    var now = new Date();
+    if(p.all){{
+      chart.dispatchAction({{type:'dataZoom',dataZoomIndex:0,start:0,end:100}});
+    }} else if(p.ytd){{
+      var s = new Date(now.getFullYear(),0,1);
+      chart.dispatchAction({{type:'dataZoom',dataZoomIndex:0,
+        startValue:s.getTime(),endValue:now.getTime()}});
+    }} else {{
+      var s = new Date(now); s.setMonth(s.getMonth()-p.m);
+      chart.dispatchAction({{type:'dataZoom',dataZoomIndex:0,
+        startValue:s.getTime(),endValue:now.getTime()}});
+    }}
+  }};
+  btnsDiv.appendChild(btn);
+}});
+</script>
+</body></html>"""
+
+    components.html(html, height=height + 55, scrolling=False)
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -391,78 +499,27 @@ with tab_mcap:
                 mcap_df = pd.DataFrame(mcap_series)
 
                 if not mcap_df.empty:
-                    COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
-                              '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
-                              '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
-
-                    def _mcap_chart(top_t, title):
-                        fig_ts = make_subplots(
-                            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                            subplot_titles=['Normalized market cap (base = 100)', 'Market cap ($B)'],
-                        )
-                        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
-                        for t in mcap_df.columns:
-                            if t not in top_t:
-                                nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                                x_bg_n.extend(list(mcap_df.index[::_BG_STEP]) + [None]); y_bg_n.extend(list(nv.iloc[::_BG_STEP]) + [None])
-                                x_bg_a.extend(list(mcap_df.index[::_BG_STEP]) + [None]); y_bg_a.extend(list(mcap_df[t].iloc[::_BG_STEP]) + [None])
-                        if x_bg_n:
-                            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
-                                fig_ts.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
-                                                             line=dict(color='lightgray', width=0.5),
-                                                             showlegend=False, hoverinfo='skip'),
-                                                 row=rn, col=1)
-                        for i, t in enumerate(top_t):
-                            company = nm.get(t, t)
-                            nv      = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                            color   = COLORS[i % len(COLORS)]
-                            fig_ts.add_trace(go.Scatter(
-                                x=mcap_df.index, y=nv, mode='lines', name=t,
-                                line=dict(color=color, width=1.8),
-                                hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                               '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
-                            ), row=1, col=1)
-                            fig_ts.add_trace(go.Scatter(
-                                x=mcap_df.index, y=mcap_df[t], mode='lines', name=t,
-                                line=dict(color=color, width=1.8), showlegend=False,
-                                hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                               '%{x|%Y-%m-%d}<br>Cap ($B): %{y:,.1f}<extra></extra>'),
-                            ), row=2, col=1)
-                        fig_ts.update_layout(
-                            title=title, height=920, hovermode='closest',
-                            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                        )
-                        fig_ts.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
-                        fig_ts.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1, autorange=True)
-                        fig_ts.update_xaxes(title_text='Date',                   row=2, col=1)
-                        fig_ts.update_xaxes(
-                            rangeselector=dict(buttons=[
-                                dict(count=1,  label='1M',  step='month', stepmode='backward'),
-                                dict(count=3,  label='3M',  step='month', stepmode='backward'),
-                                dict(count=6,  label='6M',  step='month', stepmode='backward'),
-                                dict(count=1,  label='YTD', step='year',  stepmode='todate'),
-                                dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
-                                dict(step='all', label='All'),
-                            ]),
-                            row=1, col=1,
-                        )
-                        fig_ts.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
-                        return fig_ts
-
-                    # Chart 1 — top by current (absolute) market cap
                     by_abs  = [t for t in sdf['ticker'] if t in mcap_df.columns][:TOP_N_HIGHLIGHT]
-                    # Chart 2 — top by normalized market cap growth (latest / earliest)
-                    by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()
-                    by_norm = by_norm[:TOP_N_HIGHLIGHT]
+                    by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap')
-                    with st.spinner('Rendering chart...'):
-                        _show_with_yrescale(_mcap_chart(by_abs,  f'Top {TOP_N_HIGHLIGHT} by Current Market Cap'))
+                    _echarts_dual_chart(
+                        mcap_df, by_abs, nm,
+                        norm_fn=lambda s: s / s.iloc[0] * 100,
+                        abs_fn=lambda s: s,
+                        title=f'Top {TOP_N_HIGHLIGHT} by Current Market Cap',
+                        y1_label='Normalized (base=100)', y2_label='Market Cap ($B)',
+                    )
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth')
-                    with st.spinner('Rendering chart...'):
-                        _show_with_yrescale(_mcap_chart(by_norm, f'Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth'))
+                    _echarts_dual_chart(
+                        mcap_df, by_norm, nm,
+                        norm_fn=lambda s: s / s.iloc[0] * 100,
+                        abs_fn=lambda s: s,
+                        title=f'Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth',
+                        y1_label='Normalized (base=100)', y2_label='Market Cap ($B)',
+                    )
         else:
             st.info('Required columns missing in signals.csv.')
 
@@ -476,70 +533,6 @@ with tab_prices:
         sdf_full  = _load_csv(str(signals_path))
         nm        = dict(zip(sdf_full['ticker'], sdf_full.get('company_name', sdf_full['ticker'])))
 
-        COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
-                  '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
-                  '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
-
-        def _series_chart(ordered, title):
-            top_t = [t for t in ordered if t in prices_df.columns][:TOP_N_HIGHLIGHT]
-            fig   = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                                  vertical_spacing=0.06,
-                                  subplot_titles=['Normalized price (base = 100)', 'Close price ($)'])
-
-            x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
-            for t in prices_df.columns:
-                if t not in top_t:
-                    norm_v = prices_df[t] / prices_df[t].iloc[0] * 100
-                    x_bg_n.extend(list(prices_df.index[::_BG_STEP]) + [None])
-                    y_bg_n.extend(list(norm_v.iloc[::_BG_STEP]) + [None])
-                    x_bg_a.extend(list(prices_df.index[::_BG_STEP]) + [None])
-                    y_bg_a.extend(list(prices_df[t].iloc[::_BG_STEP]) + [None])
-            if x_bg_n:
-                for row, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
-                    fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
-                                             line=dict(color='lightgray', width=0.5),
-                                             showlegend=False, hoverinfo='skip'),
-                                  row=row, col=1)
-
-            for i, t in enumerate(top_t):
-                company = nm.get(t, t)
-                norm_v  = prices_df[t] / prices_df[t].iloc[0] * 100
-                color   = COLORS[i % len(COLORS)]
-                fig.add_trace(go.Scatter(
-                    x=prices_df.index, y=norm_v, mode='lines', name=t,
-                    line=dict(color=color, width=1.8),
-                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                   '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
-                ), row=1, col=1)
-                fig.add_trace(go.Scatter(
-                    x=prices_df.index, y=prices_df[t], mode='lines', name=t,
-                    line=dict(color=color, width=1.8), showlegend=False,
-                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                   '%{x|%Y-%m-%d}<br>Price ($): %{y:,.2f}<extra></extra>'),
-                ), row=2, col=1)
-
-            fig.update_layout(
-                title=title, height=920,
-                hovermode='closest',
-                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-            )
-            fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
-            fig.update_yaxes(title_text='Close price ($)',        row=2, col=1, autorange=True)
-            fig.update_xaxes(title_text='Date',                   row=2, col=1)
-            fig.update_xaxes(
-                rangeselector=dict(buttons=[
-                    dict(count=1,  label='1M',  step='month', stepmode='backward'),
-                    dict(count=3,  label='3M',  step='month', stepmode='backward'),
-                    dict(count=6,  label='6M',  step='month', stepmode='backward'),
-                    dict(count=1,  label='YTD', step='year',  stepmode='todate'),
-                    dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
-                    dict(step='all', label='All'),
-                ]),
-                row=1, col=1,
-            )
-            fig.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
-            return fig
-
         mcap_col = 'market_cap_B' if 'market_cap_B' in sdf_full.columns else None
         by_mcap  = (sdf_full.dropna(subset=[mcap_col])
                              .sort_values(mcap_col, ascending=False)['ticker'].tolist()
@@ -552,8 +545,15 @@ with tab_prices:
             (by_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price'),
             (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return'),
         ]:
-            st.subheader(title)
-            _show_with_yrescale(_series_chart(ordering, title))
+            top_t = [t for t in ordering if t in prices_df.columns][:TOP_N_HIGHLIGHT]
+            _echarts_dual_chart(
+                prices_df, top_t, nm,
+                norm_fn=lambda s: s / s.iloc[0] * 100,
+                abs_fn=lambda s: s,
+                title=title,
+                y1_label='Normalized (base=100)',
+                y2_label='Close price ($)',
+            )
             st.divider()
     else:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
@@ -569,68 +569,28 @@ with tab_volume:
         sdf_vol = _load_csv(str(run_dir / "signals.csv")) if (run_dir / 'signals.csv').exists() else None
         nm_vol  = dict(zip(sdf_vol['ticker'], sdf_vol['company_name'])) if sdf_vol is not None and 'company_name' in sdf_vol.columns else {}
 
-        COLORS_V = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
-                    '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
-                    '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
-
-        def _volume_chart(top_t, title):
-            fig_v = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                                  subplot_titles=['Normalized volume (base = 100)', 'Volume (shares)'])
-            x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
-            for t in vol_df.columns:
-                if t not in top_t:
-                    first = vol_df[t].replace(0, float('nan')).first_valid_index()
-                    nv = vol_df[t] / vol_df[t][first] * 100 if first else vol_df[t] * 0
-                    x_bg_n.extend(list(vol_df.index[::_BG_STEP]) + [None]); y_bg_n.extend(list(nv.iloc[::_BG_STEP]) + [None])
-                    x_bg_a.extend(list(vol_df.index[::_BG_STEP]) + [None]); y_bg_a.extend(list(vol_df[t].iloc[::_BG_STEP]) + [None])
-            if x_bg_n:
-                for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
-                    fig_v.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
-                                               line=dict(color='lightgray', width=0.5),
-                                               showlegend=False, hoverinfo='skip'), row=rn, col=1)
-            for i, t in enumerate(top_t):
-                company = nm_vol.get(t, t)
-                first   = vol_df[t].replace(0, float('nan')).first_valid_index()
-                nv      = vol_df[t] / vol_df[t][first] * 100 if first else vol_df[t] * 0
-                color   = COLORS_V[i % len(COLORS_V)]
-                fig_v.add_trace(go.Scatter(
-                    x=vol_df.index, y=nv, mode='lines', name=t,
-                    line=dict(color=color, width=1.8),
-                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                   '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
-                ), row=1, col=1)
-                fig_v.add_trace(go.Scatter(
-                    x=vol_df.index, y=vol_df[t], mode='lines', name=t,
-                    line=dict(color=color, width=1.8), showlegend=False,
-                    hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                                   '%{x|%Y-%m-%d}<br>Volume: %{y:,.0f}<extra></extra>'),
-                ), row=2, col=1)
-            fig_v.update_layout(title=title, height=920, hovermode='closest',
-                                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1))
-            fig_v.update_yaxes(title_text='Normalized (base=100)', row=1, col=1, autorange=True)
-            fig_v.update_yaxes(title_text='Volume (shares)',        row=2, col=1, autorange=True)
-            fig_v.update_xaxes(title_text='Date',                   row=2, col=1)
-            fig_v.update_xaxes(rangeselector=dict(buttons=[
-                dict(count=1,  label='1M',  step='month', stepmode='backward'),
-                dict(count=3,  label='3M',  step='month', stepmode='backward'),
-                dict(count=6,  label='6M',  step='month', stepmode='backward'),
-                dict(count=1,  label='YTD', step='year',  stepmode='todate'),
-                dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
-                dict(step='all', label='All'),
-            ]), row=1, col=1)
-            fig_v.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
-            return fig_v
+        def _vol_norm(s):
+            first = s.replace(0, float('nan')).first_valid_index()
+            return s / s[first] * 100 if first is not None else s * 0
 
         by_abs_v  = vol_df.mean().sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
         by_norm_v = (vol_df.iloc[-1] / vol_df.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
-        with st.spinner('Rendering chart...'):
-            _show_with_yrescale(_volume_chart(by_abs_v,  f'Top {TOP_N_HIGHLIGHT} by Average Volume'))
+        _echarts_dual_chart(
+            vol_df, by_abs_v, nm_vol,
+            norm_fn=_vol_norm, abs_fn=lambda s: s,
+            title=f'Top {TOP_N_HIGHLIGHT} by Average Volume',
+            y1_label='Normalized (base=100)', y2_label='Volume (shares)',
+        )
         st.divider()
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth')
-        with st.spinner('Rendering chart...'):
-            _show_with_yrescale(_volume_chart(by_norm_v, f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth'))
+        _echarts_dual_chart(
+            vol_df, by_norm_v, nm_vol,
+            norm_fn=_vol_norm, abs_fn=lambda s: s,
+            title=f'Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth',
+            y1_label='Normalized (base=100)', y2_label='Volume (shares)',
+        )
 
 
 # ── Tab 6: Cumulative Returns ─────────────────────────────────────────────────
@@ -643,71 +603,15 @@ with tab_returns:
         sdf_r = _load_csv(str(run_dir / "signals.csv")) if (run_dir / 'signals.csv').exists() else None
         nm_r  = dict(zip(sdf_r['ticker'], sdf_r['company_name'])) if sdf_r is not None and 'company_name' in sdf_r.columns else {}
 
-        # Top subplot  — cumulative return in %:  (price/price[0] - 1) * 100  (starts at 0)
-        # Bottom subplot — dollar return ($):      price - price[0]             (starts at $0)
-        cum_pct = (ret_prices / ret_prices.iloc[0] - 1) * 100
-        cum_usd = ret_prices - ret_prices.iloc[0]
+        top_t_r = ((ret_prices.iloc[-1] / ret_prices.iloc[0] - 1) * 100).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
-        # Highlight: top N by final cumulative % return
-        top_t_r = cum_pct.iloc[-1].sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
-
-        COLORS_R = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
-                    '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
-                    '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
-
-        fig_r = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                              subplot_titles=['Cumulative return (%)',
-                                             'Dollar return ($ per share)'])
-
-        x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
-        for t in ret_prices.columns:
-            if t not in top_t_r:
-                x_bg_p.extend(list(cum_pct.index[::_BG_STEP]) + [None]); y_bg_p.extend(list(cum_pct[t].iloc[::_BG_STEP]) + [None])
-                x_bg_u.extend(list(cum_usd.index[::_BG_STEP]) + [None]); y_bg_u.extend(list(cum_usd[t].iloc[::_BG_STEP]) + [None])
-        if x_bg_p:
-            for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
-                fig_r.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
-                                           line=dict(color='lightgray', width=0.5),
-                                           showlegend=False, hoverinfo='skip'), row=rn, col=1)
-
-        for i, t in enumerate(top_t_r):
-            company = nm_r.get(t, t)
-            color   = COLORS_R[i % len(COLORS_R)]
-            fig_r.add_trace(go.Scatter(
-                x=cum_pct.index, y=cum_pct[t], mode='lines', name=t,
-                line=dict(color=color, width=1.8),
-                hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                               '%{x|%Y-%m-%d}<br>Return: %{y:+.2f}%<extra></extra>'),
-            ), row=1, col=1)
-            fig_r.add_trace(go.Scatter(
-                x=cum_usd.index, y=cum_usd[t], mode='lines', name=t,
-                line=dict(color=color, width=1.8), showlegend=False,
-                hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                               '%{x|%Y-%m-%d}<br>$ return: %{y:+.2f}<extra></extra>'),
-            ), row=2, col=1)
-
-        for rn in [1, 2]:
-            fig_r.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8, row=rn, col=1)
-        fig_r.update_layout(
+        _echarts_dual_chart(
+            ret_prices, top_t_r, nm_r,
+            norm_fn=lambda s: (s / s.iloc[0] - 1) * 100,
+            abs_fn=lambda s: s - s.iloc[0],
             title=f'Cumulative Returns — Top {TOP_N_HIGHLIGHT} best performers highlighted',
-            height=920, hovermode='closest',
-            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+            y1_label='Cum. return (%)', y2_label='$ return/share',
         )
-        fig_r.update_yaxes(title_text='Cumulative return (%)',   row=1, col=1, autorange=True)
-        fig_r.update_yaxes(title_text='Dollar return ($/share)', row=2, col=1, autorange=True)
-        fig_r.update_xaxes(title_text='Date',                    row=2, col=1)
-        fig_r.update_xaxes(rangeselector=dict(buttons=[
-            dict(count=1,  label='1M',  step='month', stepmode='backward'),
-            dict(count=3,  label='3M',  step='month', stepmode='backward'),
-            dict(count=6,  label='6M',  step='month', stepmode='backward'),
-            dict(count=1,  label='YTD', step='year',  stepmode='todate'),
-            dict(count=1,  label='1Y',  step='year',  stepmode='backward'),
-            dict(step='all', label='All'),
-        ]), row=1, col=1)
-        fig_r.update_xaxes(rangeslider=dict(visible=True, thickness=0.05), row=2, col=1)
-
-        with st.spinner('Rendering chart...'):
-            _show_with_yrescale(fig_r)
 
 
 # ── Tab 7: Correlation Analysis ───────────────────────────────────────────────
