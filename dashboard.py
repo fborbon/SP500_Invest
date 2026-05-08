@@ -85,10 +85,36 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
         const m=document.getElementById('main');
         const t=document.getElementById('top-bar');
         const ti=document.getElementById('top-inner');
-        function sync(){{ti.style.width=m.scrollWidth+'px';}}
-        sync(); setTimeout(sync,300); setTimeout(sync,1000);
+        function sync(){{if(m.scrollWidth>0)ti.style.width=m.scrollWidth+'px';}}
+        [0,200,500,1000,2000,4000].forEach(d=>setTimeout(sync,d));
+        if(window.ResizeObserver){{new ResizeObserver(sync).observe(m);}}
         t.addEventListener('scroll',()=>m.scrollLeft=t.scrollLeft);
         m.addEventListener('scroll',()=>t.scrollLeft=m.scrollLeft);
+
+        // ── Column sorting ──────────────────────────────────────────────────
+        const ths=Array.from(document.querySelectorAll('thead th'));
+        ths.forEach(th=>{{th.dataset.orig=th.textContent; th.style.cursor='pointer'; th.style.userSelect='none';}});
+        let sortCol=-1, sortAsc=true;
+        const clean=v=>v.replace(/[^0-9.-]/g,'');
+        ths.forEach((th,idx)=>{{
+          th.addEventListener('click',()=>{{
+            if(sortCol===idx){{sortAsc=!sortAsc;}}else{{sortCol=idx;sortAsc=true;}}
+            ths.forEach((h,i)=>{{h.textContent=h.dataset.orig+(i===sortCol?(sortAsc?' ▲':' ▼'):'');}});
+            const tbody=m.querySelector('tbody');
+            const rows=Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a,b)=>{{
+              const av=a.cells[idx].textContent.trim();
+              const bv=b.cells[idx].textContent.trim();
+              const an=parseFloat(clean(av)), bn=parseFloat(clean(bv));
+              const aok=!isNaN(an), bok=!isNaN(bn);
+              if(!aok&&bok)return 1; if(aok&&!bok)return -1;
+              if(!aok&&!bok)return av.localeCompare(bv);
+              return sortAsc?an-bn:bn-an;
+            }});
+            rows.forEach(r=>tbody.appendChild(r));
+            sync();
+          }});
+        }});
       </script>
     </body></html>
     """
