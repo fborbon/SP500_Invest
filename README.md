@@ -5,7 +5,7 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term price m
 ## Requirements
 
 ```bash
-pip install ib_insync pandas numpy scikit-learn matplotlib requests yfinance streamlit nest_asyncio
+pip install ib_insync pandas numpy scikit-learn plotly kaleido requests yfinance streamlit nest_asyncio
 ```
 
 - Interactive Brokers TWS or IB Gateway running locally (only needed to place orders)

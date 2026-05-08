@@ -1,266 +1,174 @@
-import matplotlib
-matplotlib.use('Agg')   # non-interactive backend — no display/tkinter needed
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.subplots import make_subplots
 
 from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
+COLORS = [
+    '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+    '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+    '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5',
+    '#c49c94','#f7b6d2','#dbdb8d','#9edae5','#ad494a',
+]
+
+_EXPORT = dict(width=1800, height=1200, scale=2)
+
+
+def _save(fig, path):
+    pio.write_image(fig, str(path), **_EXPORT)
+    print(f"  Saved: {path}")
+
 
 def plot_correlation_matrix(corr_matrix, save_path=None):
-    """Save the correlation matrix as a heatmap PNG."""
     if save_path is None:
         save_path = OUTPUTS_DIR / 'correlation_matrix.png'
 
-    fig, ax = plt.subplots(figsize=(14, 12))
     n = len(corr_matrix)
-    im = ax.imshow(corr_matrix.values, cmap='RdYlGn', vmin=-1, vmax=1, aspect='auto')
-    plt.colorbar(im, ax=ax, label='Pearson Correlation')
+    vals = corr_matrix.values
+    labels = corr_matrix.columns.tolist()
 
-    ax.set_xticks(range(n))
-    ax.set_yticks(range(n))
-    ax.set_xticklabels(corr_matrix.columns, rotation=45, ha='right', fontsize=9)
-    ax.set_yticklabels(corr_matrix.columns, fontsize=9)
+    text = [[f'{vals[i,j]:.2f}' for j in range(n)] for i in range(n)]
 
-    for i in range(n):
-        for j in range(n):
-            val = corr_matrix.values[i, j]
-            color = 'black' if 0.3 < abs(val) < 0.8 else 'white'
-            ax.text(j, i, f'{val:.2f}', ha='center', va='center', fontsize=7, color=color)
-
-    ax.set_title(f'Correlation Matrix — Top {n} S&P 500 companies by market cap',
-                 fontsize=14, pad=16)
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Correlation matrix saved to: {save_path}")
+    fig = go.Figure(go.Heatmap(
+        z=vals, x=labels, y=labels,
+        text=text, texttemplate='%{text}', textfont=dict(size=7),
+        colorscale='RdYlGn', zmin=-1, zmax=1,
+        colorbar=dict(title='Pearson r'),
+    ))
+    fig.update_layout(
+        title=f'Correlation Matrix — Top {n} S&P 500 companies by market cap',
+        height=900, width=1000,
+        xaxis=dict(tickangle=45, tickfont=dict(size=9)),
+        yaxis=dict(autorange='reversed', tickfont=dict(size=9)),
+        margin=dict(l=80, r=40, t=60, b=120),
+    )
+    _save(fig, save_path)
 
 
 def plot_price_series(prices_df, tickers_ordered, top_n=TOP_N_HIGHLIGHT, label='market cap',
                       save_path=None):
-    """Two-subplot price time series for all tickers in prices_df.
-
-    Top subplot    — normalized prices (base = 100).
-    Bottom subplot — absolute close prices ($).
-
-    Top N tickers (ordered by tickers_ordered) drawn in distinct colors with
-    labels; all others as thin light-gray lines without labels.
-    Both subplots share the same X axis and color coding.
-
-    Args:
-        label: describes how tickers_ordered is ranked (used in the plot title).
-               e.g. 'market cap' or 'stock price'.
-    """
     if save_path is None:
         save_path = OUTPUTS_DIR / 'price_series_market-cap.png'
 
-    top_tickers = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
-    colors = plt.cm.tab20.colors
+    top_t = [t for t in tickers_ordered if t in prices_df.columns][:top_n]
 
-    fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
-                                           gridspec_kw={'hspace': 0.06})
-    fig.suptitle(f'S&P 500 Price Series — Top {len(top_tickers)} by {label} highlighted',
-                 fontsize=13, fontweight='bold')
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                        subplot_titles=['Normalized price (base = 100)', 'Close price ($)'])
 
-    def normalize(series):
-        return series / series.iloc[0] * 100
+    x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+    for t in prices_df.columns:
+        if t not in top_t:
+            nv = prices_df[t] / prices_df[t].iloc[0] * 100
+            x_bg_n.extend(list(prices_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+            x_bg_a.extend(list(prices_df.index) + [None]); y_bg_a.extend(list(prices_df[t]) + [None])
+    if x_bg_n:
+        for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+            fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                     line=dict(color='lightgray', width=0.5),
+                                     showlegend=False, hoverinfo='skip'), row=rn, col=1)
 
-    for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
-        # Background — all non-top tickers in gray
-        for ticker in prices_df.columns:
-            if ticker not in top_tickers:
-                data = normalize(prices_df[ticker]) if use_norm else prices_df[ticker]
-                ax.plot(prices_df.index, data,
-                        color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
+    for i, t in enumerate(top_t):
+        nv    = prices_df[t] / prices_df[t].iloc[0] * 100
+        color = COLORS[i % len(COLORS)]
+        fig.add_trace(go.Scatter(x=prices_df.index, y=nv, mode='lines', name=t,
+                                  line=dict(color=color, width=1.5)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=prices_df.index, y=prices_df[t], mode='lines', name=t,
+                                  line=dict(color=color, width=1.5),
+                                  showlegend=False), row=2, col=1)
 
-        # Foreground — top N tickers in color with labels
-        for idx, ticker in enumerate(top_tickers):
-            data = normalize(prices_df[ticker]) if use_norm else prices_df[ticker]
-            ax.plot(prices_df.index, data,
-                    color=colors[idx % 20], linewidth=1.6, alpha=0.9,
-                    label=ticker, zorder=2)
-
-        ax.grid(True, alpha=0.2)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-    ax_norm.set_ylabel('Normalized price (base = 100)')
-    ax_norm.set_title('Normalized prices')
-    ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-
-    ax_abs.set_ylabel('Close price ($)')
-    ax_abs.set_title('Absolute prices')
-    ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-    ax_abs.set_xlabel('Date')
-    ax_abs.tick_params(axis='x', rotation=30)
-
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Price series saved to: {save_path}")
+    fig.update_layout(
+        title=f'S&P 500 Price Series — Top {len(top_t)} by {label} highlighted',
+        height=1000, legend=dict(orientation='h', y=1.02, x=1, xanchor='right'),
+    )
+    fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+    fig.update_yaxes(title_text='Close price ($)',        row=2, col=1)
+    fig.update_xaxes(title_text='Date',                   row=2, col=1)
+    _save(fig, save_path)
 
 
 def plot_market_cap_bars(prices_df, tickers_ordered, market_caps=None,
                          top_n=TOP_N_HIGHLIGHT, save_path=None):
-    """Two-subplot bar chart for top N and bottom N companies (by market cap order).
-
-    Top subplot    — last closing stock price ($).
-    Bottom subplot — market capitalization ($B), requires market_caps dict.
-                     If market_caps is None the bottom subplot is skipped.
-
-    Both subplots share the same X axis (same companies, same order).
-    Top N shown in green, bottom N in coral, with a gap between groups.
-    """
     if save_path is None:
         save_path = OUTPUTS_DIR / 'market_cap_bars.png'
 
-    available     = [t for t in tickers_ordered if t in prices_df.columns]
-    top           = available[:top_n]
-    bottom        = available[-top_n:] if len(available) >= top_n * 2 else available[top_n:]
-    labels        = top + bottom
-    n_bars        = len(labels)
+    available = [t for t in tickers_ordered if t in prices_df.columns]
+    top        = available[:top_n]
+    bottom     = available[-top_n:] if len(available) >= top_n * 2 else available[top_n:]
 
-    gap      = 2
-    x_top    = list(range(len(top)))
-    x_bottom = [x + len(top) + gap for x in range(len(bottom))]
-    x_all    = x_top + x_bottom
+    fig = make_subplots(rows=2, cols=1, vertical_spacing=0.12,
+                        subplot_titles=['Last Close Price ($)', 'Market Capitalization ($B)'])
 
-    top_prices    = [prices_df[t].iloc[-1] for t in top]
-    bottom_prices = [prices_df[t].iloc[-1] for t in bottom]
+    for grp, color, name in [(top, 'mediumseagreen', f'Top {len(top)}'),
+                              (bottom, 'tomato', f'Bottom {len(bottom)}')]:
+        prices = [prices_df[t].iloc[-1] for t in grp]
+        fig.add_trace(go.Bar(x=grp, y=prices, name=name, marker_color=color), row=1, col=1)
+        if market_caps:
+            caps = [market_caps.get(t, 0) / 1e9 for t in grp]
+            fig.add_trace(go.Bar(x=grp, y=caps, name=name, marker_color=color,
+                                  showlegend=False), row=2, col=1)
 
-    n_rows  = 2 if market_caps else 1
-    fig_h   = 7 * n_rows
-    fig_w   = max(16, n_bars * 0.85)
-    fig, axes = plt.subplots(n_rows, 1, figsize=(fig_w, fig_h),
-                             sharex=True,
-                             gridspec_kw={'hspace': 0.08})
-    ax_price = axes[0] if n_rows == 2 else axes
-    fig.suptitle(f'Top {len(top)} vs Bottom {len(bottom)} S&P 500 Companies',
-                 fontsize=13, fontweight='bold', y=1.01)
-
-    # ── Top subplot: last close price ────────────────────────
-    def _bar_labels(ax, bars, fmt):
-        for bar in bars:
-            ax.text(bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() * 1.01,
-                    fmt(bar.get_height()),
-                    ha='center', va='bottom', fontsize=7, rotation=45)
-
-    bt = ax_price.bar(x_top,    top_prices,    color='mediumseagreen', alpha=0.85,
-                      edgecolor='white', linewidth=0.5,
-                      label=f'Top {len(top)} (most valuable)')
-    bb = ax_price.bar(x_bottom, bottom_prices, color='tomato',         alpha=0.85,
-                      edgecolor='white', linewidth=0.5,
-                      label=f'Bottom {len(bottom)} (least valuable)')
-    _bar_labels(ax_price, bt + bb, lambda v: f'${v:,.0f}')
-    ax_price.set_ylabel('Last Close Price ($)')
-    ax_price.set_title('Stock Price')
-    ax_price.legend(fontsize=8)
-    ax_price.grid(axis='y', alpha=0.25)
-    ax_price.spines['top'].set_visible(False)
-    ax_price.spines['right'].set_visible(False)
-
-    # ── Bottom subplot: market capitalisation ─────────────────
-    if market_caps:
-        ax_mcap = axes[1]
-        top_caps    = [market_caps.get(t, 0) / 1e9 for t in top]
-        bottom_caps = [market_caps.get(t, 0) / 1e9 for t in bottom]
-
-        bt2 = ax_mcap.bar(x_top,    top_caps,    color='mediumseagreen', alpha=0.85,
-                          edgecolor='white', linewidth=0.5)
-        bb2 = ax_mcap.bar(x_bottom, bottom_caps, color='tomato',         alpha=0.85,
-                          edgecolor='white', linewidth=0.5)
-        _bar_labels(ax_mcap, bt2 + bb2,
-                    lambda v: f'${v/1e3:.1f}T' if v >= 1000 else f'${v:.0f}B')
-        ax_mcap.set_ylabel('Market Cap ($B)')
-        ax_mcap.set_title('Market Capitalization')
-        ax_mcap.set_xticks(x_all)
-        ax_mcap.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
-        ax_mcap.grid(axis='y', alpha=0.25)
-        ax_mcap.spines['top'].set_visible(False)
-        ax_mcap.spines['right'].set_visible(False)
-    else:
-        ax_price.set_xticks(x_all)
-        ax_price.set_xticklabels(labels, rotation=45, ha='right', fontsize=9)
-
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Market cap bars saved to: {save_path}")
+    fig.update_layout(
+        title=f'Top {len(top)} vs Bottom {len(bottom)} S&P 500 Companies',
+        height=900, barmode='group',
+        legend=dict(orientation='h', y=1.02, x=1, xanchor='right'),
+    )
+    fig.update_yaxes(title_text='Price ($)',       row=1, col=1)
+    fig.update_yaxes(title_text='Market Cap ($B)', row=2, col=1)
+    _save(fig, save_path)
 
 
 def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
                            save_path_abs=None, save_path_norm=None):
-    """Two PNG files — market cap time series (approximated as price × shares).
+    if save_path_abs  is None: save_path_abs  = OUTPUTS_DIR / 'market_cap_series_absolute.png'
+    if save_path_norm is None: save_path_norm = OUTPUTS_DIR / 'market_cap_series_normalized.png'
 
-    Chart 1 (save_path_abs):  top N highlighted by current (absolute) market cap.
-    Chart 2 (save_path_norm): top N highlighted by normalised cap growth (latest/earliest).
-
-    Each chart has two subplots: normalised cap on top, absolute ($B) on bottom.
-    """
-    if save_path_abs is None:
-        save_path_abs  = OUTPUTS_DIR / 'market_cap_series_absolute.png'
-    if save_path_norm is None:
-        save_path_norm = OUTPUTS_DIR / 'market_cap_series_normalized.png'
-
-    # Build approximate historical market cap (price × implied shares)
     mcap_series = {}
     for t in prices_df.columns:
         cap_usd = market_caps.get(t, 0)
         price   = prices_df[t].iloc[-1]
         if cap_usd > 0 and price > 0:
-            shares = cap_usd / price
-            mcap_series[t] = prices_df[t] * shares / 1e9   # $B
-
+            mcap_series[t] = prices_df[t] * (cap_usd / price) / 1e9
     if not mcap_series:
-        print("  ✗ No market cap data available for time series.")
+        print("  ✗ No market cap data for time series.")
         return
-
     mcap_df = pd.DataFrame(mcap_series)
-    colors  = plt.cm.tab20.colors
 
-    # Orderings
     by_abs  = sorted(mcap_series, key=lambda t: market_caps.get(t, 0), reverse=True)
     by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
     def _plot(ordered, save_path, label):
         top_t = ordered[:top_n]
-
-        fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
-                                               gridspec_kw={'hspace': 0.06})
-        fig.suptitle(f'S&P 500 Market Cap Time Series — Top {len(top_t)} by {label} highlighted',
-                     fontsize=13, fontweight='bold')
-
-        def normalize(series):
-            return series / series.iloc[0] * 100
-
-        for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
-            for t in mcap_df.columns:
-                if t not in top_t:
-                    data = normalize(mcap_df[t]) if use_norm else mcap_df[t]
-                    ax.plot(mcap_df.index, data, color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
-            for idx, t in enumerate(top_t):
-                data = normalize(mcap_df[t]) if use_norm else mcap_df[t]
-                ax.plot(mcap_df.index, data, color=colors[idx % 20], linewidth=1.6, alpha=0.9,
-                        label=t, zorder=2)
-            ax.grid(True, alpha=0.2)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-
-        ax_norm.set_ylabel('Normalized market cap (base = 100)')
-        ax_norm.set_title('Normalized market cap')
-        ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-
-        ax_abs.set_ylabel('Market cap ($B)')
-        ax_abs.set_title('Absolute market cap')
-        ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-        ax_abs.set_xlabel('Date')
-        ax_abs.tick_params(axis='x', rotation=30)
-
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-        print(f"  Market cap series saved to: {save_path}")
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                            subplot_titles=['Normalized market cap (base = 100)', 'Market cap ($B)'])
+        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+        for t in mcap_df.columns:
+            if t not in top_t:
+                nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
+                x_bg_n.extend(list(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                x_bg_a.extend(list(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
+        if x_bg_n:
+            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                         line=dict(color='lightgray', width=0.5),
+                                         showlegend=False, hoverinfo='skip'), row=rn, col=1)
+        for i, t in enumerate(top_t):
+            nv    = mcap_df[t] / mcap_df[t].iloc[0] * 100
+            color = COLORS[i % len(COLORS)]
+            fig.add_trace(go.Scatter(x=mcap_df.index, y=nv, mode='lines', name=t,
+                                      line=dict(color=color, width=1.5)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=mcap_df.index, y=mcap_df[t], mode='lines', name=t,
+                                      line=dict(color=color, width=1.5),
+                                      showlegend=False), row=2, col=1)
+        fig.update_layout(
+            title=f'Market Cap Time Series — Top {top_n} by {label}',
+            height=1000, legend=dict(orientation='h', y=1.02, x=1, xanchor='right'),
+        )
+        fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+        fig.update_yaxes(title_text='Market Cap ($B)',        row=2, col=1)
+        fig.update_xaxes(title_text='Date',                   row=2, col=1)
+        _save(fig, save_path)
 
     _plot(by_abs,  save_path_abs,  'current market cap')
     _plot(by_norm, save_path_norm, 'normalized cap growth')
@@ -268,187 +176,157 @@ def plot_market_cap_series(prices_df, market_caps: dict, top_n=TOP_N_HIGHLIGHT,
 
 def plot_volume_series(volume_df, top_n=TOP_N_HIGHLIGHT,
                        save_path_abs=None, save_path_norm=None):
-    """Two PNG files — daily traded volume time series.
-
-    Chart 1 (save_path_abs):  top N highlighted by highest total/average volume.
-    Chart 2 (save_path_norm): top N highlighted by normalised volume growth (latest/earliest).
-
-    Each chart has two subplots: normalised on top, absolute (shares) on bottom.
-    """
-    if save_path_abs is None:
-        save_path_abs  = OUTPUTS_DIR / 'volume_series_absolute.png'
-    if save_path_norm is None:
-        save_path_norm = OUTPUTS_DIR / 'volume_series_normalized.png'
-
-    colors = plt.cm.tab20.colors
+    if save_path_abs  is None: save_path_abs  = OUTPUTS_DIR / 'volume_series_absolute.png'
+    if save_path_norm is None: save_path_norm = OUTPUTS_DIR / 'volume_series_normalized.png'
 
     by_abs  = volume_df.mean().sort_values(ascending=False).index.tolist()
     by_norm = (volume_df.iloc[-1] / volume_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
     def _plot(ordered, save_path, label):
         top_t = [t for t in ordered if t in volume_df.columns][:top_n]
-
-        fig, (ax_norm, ax_abs) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
-                                               gridspec_kw={'hspace': 0.06})
-        fig.suptitle(f'S&P 500 Daily Volume — Top {len(top_t)} by {label} highlighted',
-                     fontsize=13, fontweight='bold')
-
-        def normalize(series):
-            first = series.replace(0, float('nan')).first_valid_index()
-            if first is None:
-                return series * 0
-            return series / series[first] * 100
-
-        for ax, use_norm in [(ax_norm, True), (ax_abs, False)]:
-            for t in volume_df.columns:
-                if t not in top_t:
-                    data = normalize(volume_df[t]) if use_norm else volume_df[t]
-                    ax.plot(volume_df.index, data, color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
-            for idx, t in enumerate(top_t):
-                data = normalize(volume_df[t]) if use_norm else volume_df[t]
-                ax.plot(volume_df.index, data, color=colors[idx % 20], linewidth=1.6, alpha=0.9,
-                        label=t, zorder=2)
-            ax.grid(True, alpha=0.2)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-
-        ax_norm.set_ylabel('Normalized volume (base = 100)')
-        ax_norm.set_title('Normalized volume')
-        ax_norm.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-
-        ax_abs.set_ylabel('Volume (shares)')
-        ax_abs.set_title('Absolute volume')
-        ax_abs.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-        ax_abs.set_xlabel('Date')
-        ax_abs.tick_params(axis='x', rotation=30)
-
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-        print(f"  Volume series saved to: {save_path}")
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                            subplot_titles=['Normalized volume (base = 100)', 'Volume (shares)'])
+        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+        for t in volume_df.columns:
+            if t not in top_t:
+                first = volume_df[t].replace(0, float('nan')).first_valid_index()
+                nv = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
+                x_bg_n.extend(list(volume_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
+                x_bg_a.extend(list(volume_df.index) + [None]); y_bg_a.extend(list(volume_df[t]) + [None])
+        if x_bg_n:
+            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                         line=dict(color='lightgray', width=0.5),
+                                         showlegend=False, hoverinfo='skip'), row=rn, col=1)
+        for i, t in enumerate(top_t):
+            first = volume_df[t].replace(0, float('nan')).first_valid_index()
+            nv    = volume_df[t] / volume_df[t][first] * 100 if first else volume_df[t] * 0
+            color = COLORS[i % len(COLORS)]
+            fig.add_trace(go.Scatter(x=volume_df.index, y=nv, mode='lines', name=t,
+                                      line=dict(color=color, width=1.5)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=volume_df.index, y=volume_df[t], mode='lines', name=t,
+                                      line=dict(color=color, width=1.5),
+                                      showlegend=False), row=2, col=1)
+        fig.update_layout(
+            title=f'Volume Time Series — Top {top_n} by {label}',
+            height=1000, legend=dict(orientation='h', y=1.02, x=1, xanchor='right'),
+        )
+        fig.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
+        fig.update_yaxes(title_text='Volume (shares)',        row=2, col=1)
+        fig.update_xaxes(title_text='Date',                   row=2, col=1)
+        _save(fig, save_path)
 
     _plot(by_abs,  save_path_abs,  'average volume')
     _plot(by_norm, save_path_norm, 'normalized volume growth')
 
 
 def plot_cumulative_returns(prices_df, top_n=TOP_N_HIGHLIGHT, save_path=None):
-    """Two-subplot PNG of cumulative returns for all tickers.
-
-    Top subplot    — normalized price (base = 100).
-    Bottom subplot — cumulative return in % (starts at 0).
-
-    Top N tickers by highest final cumulative return are highlighted in color.
-    """
     if save_path is None:
         save_path = OUTPUTS_DIR / 'cumulative_returns.png'
 
     cum_pct = (prices_df / prices_df.iloc[0] - 1) * 100
     cum_usd = prices_df - prices_df.iloc[0]
     top_t   = cum_pct.iloc[-1].sort_values(ascending=False).index.tolist()[:top_n]
-    colors  = plt.cm.tab20.colors
 
-    fig, (ax_pct, ax_usd) = plt.subplots(2, 1, figsize=(18, 14), sharex=True,
-                                          gridspec_kw={'hspace': 0.06})
-    fig.suptitle(f'S&P 500 Cumulative Returns — Top {len(top_t)} best performers highlighted',
-                 fontsize=13, fontweight='bold')
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                        subplot_titles=['Cumulative return (%)', 'Dollar return ($ per share)'])
 
-    for ax, df in [(ax_pct, cum_pct), (ax_usd, cum_usd)]:
-        for t in prices_df.columns:
-            if t not in top_t:
-                ax.plot(df.index, df[t], color='lightgray', linewidth=0.6, alpha=0.6, zorder=1)
-        for idx, t in enumerate(top_t):
-            ax.plot(df.index, df[t], color=colors[idx % 20], linewidth=1.6, alpha=0.9,
-                    label=t, zorder=2)
-        ax.axhline(0, color='grey', linewidth=0.8, linestyle='--', alpha=0.6)
-        ax.grid(True, alpha=0.2)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+    x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
+    for t in prices_df.columns:
+        if t not in top_t:
+            x_bg_p.extend(list(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
+            x_bg_u.extend(list(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
+    if x_bg_p:
+        for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
+            fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
+                                     line=dict(color='lightgray', width=0.5),
+                                     showlegend=False, hoverinfo='skip'), row=rn, col=1)
 
-    ax_pct.set_ylabel('Cumulative return (%)')
-    ax_pct.set_title('Cumulative return (%)')
-    ax_pct.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-    ax_usd.set_ylabel('Dollar return ($ per share)')
-    ax_usd.set_title('Dollar return ($ per share)')
-    ax_usd.legend(fontsize=8, loc='upper left', ncol=3, framealpha=0.8)
-    ax_usd.set_xlabel('Date')
-    ax_usd.tick_params(axis='x', rotation=30)
+    for i, t in enumerate(top_t):
+        color = COLORS[i % len(COLORS)]
+        fig.add_trace(go.Scatter(x=cum_pct.index, y=cum_pct[t], mode='lines', name=t,
+                                  line=dict(color=color, width=1.5)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=cum_usd.index, y=cum_usd[t], mode='lines', name=t,
+                                  line=dict(color=color, width=1.5),
+                                  showlegend=False), row=2, col=1)
 
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Cumulative returns saved to: {save_path}")
+    for rn in [1, 2]:
+        fig.add_hline(y=0, line_dash='dash', line_color='grey', line_width=1, row=rn, col=1)
+    fig.update_layout(
+        title=f'Cumulative Returns — Top {top_n} best performers highlighted',
+        height=1000, legend=dict(orientation='h', y=1.02, x=1, xanchor='right'),
+    )
+    fig.update_yaxes(title_text='Cumulative return (%)',   row=1, col=1)
+    fig.update_yaxes(title_text='Dollar return ($/share)', row=2, col=1)
+    fig.update_xaxes(title_text='Date',                    row=2, col=1)
+    _save(fig, save_path)
 
 
 def plot_prediction_analysis(target: str, returns, prices_df,
                               top5: list, corr_signs: dict,
                               y_actual: np.ndarray, y_predicted: np.ndarray,
                               save_path=None):
-    """Dual subplot for a single ticker:
-      Left  — scatter of actual cumulative returns (X) vs model predictions (Y).
-      Right — normalized price time series of target + top 5 correlated tickers.
-              Direct correlators (r > 0) drawn as solid lines,
-              inverse correlators (r < 0) drawn as dashed lines.
-    """
     if save_path is None:
         save_path = OUTPUTS_DIR / f'analysis_{target}.png'
 
-    fig, (ax_sc, ax_ts) = plt.subplots(1, 2, figsize=(16, 6))
-    fig.suptitle(f'{target} — Prediction Analysis (Random Forest)',
-                 fontsize=14, fontweight='bold')
-
-    # ── Left: actual vs predicted scatter ────────────────────
     r2 = float(np.corrcoef(y_actual, y_predicted)[0, 1] ** 2)
 
-    ax_sc.scatter(y_actual * 100, y_predicted * 100,
-                  alpha=0.35, s=18, color='steelblue', label='Observations')
+    fig = make_subplots(rows=1, cols=2,
+                        subplot_titles=['Actual vs Predicted (in-sample)',
+                                        'Price series — target and predictors'])
+
+    # ── Left: scatter actual vs predicted ────────────────────────────────────
+    fig.add_trace(go.Scatter(
+        x=y_actual * 100, y=y_predicted * 100, mode='markers',
+        marker=dict(color='steelblue', size=5, opacity=0.4),
+        name='Observations',
+    ), row=1, col=1)
 
     lim = max(abs(y_actual).max(), abs(y_predicted).max()) * 100 * 1.15
-    ax_sc.plot([-lim, lim], [-lim, lim], 'k--', linewidth=1, alpha=0.4,
-               label='Perfect prediction')
+    fig.add_trace(go.Scatter(
+        x=[-lim, lim], y=[-lim, lim], mode='lines',
+        line=dict(color='black', dash='dash', width=1), name='Perfect prediction',
+    ), row=1, col=1)
 
     m, b = np.polyfit(y_actual * 100, y_predicted * 100, 1)
     x_line = np.linspace(y_actual.min() * 100, y_actual.max() * 100, 100)
-    ax_sc.plot(x_line, m * x_line + b, color='crimson', linewidth=1.8,
-               label=f'Trend  R²={r2:.3f}')
+    fig.add_trace(go.Scatter(
+        x=x_line, y=m * x_line + b, mode='lines',
+        line=dict(color='crimson', width=2), name=f'Trend  R²={r2:.3f}',
+    ), row=1, col=1)
 
-    ax_sc.axhline(0, color='grey', linewidth=0.5, alpha=0.6)
-    ax_sc.axvline(0, color='grey', linewidth=0.5, alpha=0.6)
-    ax_sc.set_aspect('equal', adjustable='box')
-    ax_sc.set_xlabel('Actual cumulative return (%)')
-    ax_sc.set_ylabel('Predicted return (%)')
-    ax_sc.set_title('Actual vs Predicted (in-sample)')
-    ax_sc.legend(fontsize=8)
-    ax_sc.grid(True, alpha=0.25)
+    fig.add_hline(y=0, line_dash='dot', line_color='grey', line_width=0.8, row=1, col=1)
+    fig.add_vline(x=0, line_dash='dot', line_color='grey', line_width=0.8, row=1, col=1)
 
-    # ── Right: normalized price time series ──────────────────
-    colors = plt.cm.tab10.colors
+    # ── Right: normalized price time series ──────────────────────────────────
     plot_tickers = [t for t in top5 if t in prices_df.columns]
 
     def normalize(series):
         return series / series.iloc[0] * 100
 
     if target in prices_df.columns:
-        ax_ts.plot(prices_df.index, normalize(prices_df[target]),
-                   color='black', linewidth=2.5, zorder=5,
-                   label=f'{target} (target)')
+        fig.add_trace(go.Scatter(
+            x=prices_df.index, y=normalize(prices_df[target]), mode='lines',
+            name=f'{target} (target)', line=dict(color='black', width=2.5),
+        ), row=1, col=2)
 
-    for idx, ticker in enumerate(plot_tickers):
-        r = corr_signs.get(ticker, 0)
-        linestyle = '-' if r > 0 else '--'
+    for i, ticker in enumerate(plot_tickers):
+        r         = corr_signs.get(ticker, 0)
         direction = '↑' if r > 0 else '↓'
-        ax_ts.plot(prices_df.index, normalize(prices_df[ticker]),
-                   color=colors[idx % 10], linestyle=linestyle,
-                   linewidth=1.4, alpha=0.85,
-                   label=f'{direction} {ticker}  r={r:+.2f}')
+        dash      = 'solid' if r > 0 else 'dash'
+        fig.add_trace(go.Scatter(
+            x=prices_df.index, y=normalize(prices_df[ticker]), mode='lines',
+            name=f'{direction} {ticker}  r={r:+.2f}',
+            line=dict(color=COLORS[i % len(COLORS)], dash=dash, width=1.4),
+        ), row=1, col=2)
 
-    ax_ts.set_xlabel('Date')
-    ax_ts.set_ylabel('Normalized price (base = 100)')
-    ax_ts.set_title('Price series — target and predictors')
-    ax_ts.legend(fontsize=8, loc='upper left')
-    ax_ts.grid(True, alpha=0.25)
-    ax_ts.tick_params(axis='x', rotation=30)
-
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  Analysis saved to: {save_path}")
+    fig.update_layout(
+        title=f'{target} — Prediction Analysis (Random Forest)',
+        height=600, width=1400,
+        legend=dict(orientation='v', x=1.01, y=1),
+    )
+    fig.update_xaxes(title_text='Actual cumulative return (%)',  row=1, col=1)
+    fig.update_yaxes(title_text='Predicted return (%)',          row=1, col=1)
+    fig.update_xaxes(title_text='Date',                          row=1, col=2)
+    fig.update_yaxes(title_text='Normalized price (base=100)',   row=1, col=2)
+    _save(fig, save_path)
