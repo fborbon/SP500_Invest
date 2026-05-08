@@ -148,9 +148,20 @@ def _show_with_yrescale(fig, height: int = 920):
         height=height,
     )
 
+    # Switch showlegend traces to lines+markers so legend shows a circle, not a line
+    for trace in fig.data:
+        if getattr(trace, 'showlegend', False) is not False and getattr(trace, 'mode', '') == 'lines':
+            trace.mode = 'lines+markers'
+            trace.marker = dict(symbol='circle', size=5, opacity=0.7)
+
     base_html = fig.to_html(include_plotlyjs=True, full_html=True,
                             div_id='plotly-chart',
                             default_height=f'{height}px', default_width='100%')
+
+    legend_css = """<style>
+  /* Hide line segment in Plotly legend — show only the circle marker */
+  g.legendlines path, g.legendlines rect { display: none !important; }
+</style>"""
 
     rescale_js = """<script>
 (function(){
@@ -200,7 +211,7 @@ def _show_with_yrescale(fig, height: int = 920):
 })();
 </script>"""
 
-    html = base_html.replace('</body>', rescale_js + '\n</body>')
+    html = base_html.replace('</head>', legend_css + '\n</head>').replace('</body>', rescale_js + '\n</body>')
     components.html(html, height=height + 40, scrolling=False)
 
 
