@@ -11,6 +11,13 @@ import streamlit.components.v1 as components
 
 from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
+@st.cache_data
+def _load_csv(path, **kwargs):
+    return pd.read_csv(path, **kwargs)
+
+# Downsample step for background traces — keeps every Nth point to reduce render time
+_BG_STEP = 5
+
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title='SP500 Bot Dashboard',
@@ -150,7 +157,7 @@ with tab_signals:
     if not signals_path.exists():
         st.info('signals.csv not found for this run.')
     else:
-        df = pd.read_csv(signals_path)
+        df = _load_csv(str(signals_path))
         name_map = dict(zip(df['ticker'], df.get('company_name', df['ticker'])))
 
         buys  = (df['signal'] == 'BUY').sum()
@@ -213,7 +220,7 @@ with tab_fund:
     if not path.exists():
         st.info('fundamentals.csv not found for this run.')
     else:
-        df = pd.read_csv(path, index_col=0)
+        df = _load_csv(str(path), index_col=0)
 
         c1, c2, c3 = st.columns(3)
         c1.metric('Companies analysed', len(df))
@@ -248,7 +255,7 @@ with tab_mcap:
     if not signals_path.exists():
         st.info('signals.csv not found for this run.')
     else:
-        sdf = pd.read_csv(signals_path)
+        sdf = _load_csv(str(signals_path))
         if {'ticker', 'company_name', 'current_price', 'market_cap_B', 'sector'}.issubset(sdf.columns):
             sdf = sdf.dropna(subset=['market_cap_B']).sort_values('market_cap_B', ascending=False)
             top    = sdf.head(TOP_N_HIGHLIGHT)
@@ -295,7 +302,7 @@ with tab_mcap:
             # ── Market cap time series ────────────────────────────────────────
             prices_path = run_dir / 'prices.csv'
             if prices_path.exists():
-                prices_df = pd.read_csv(prices_path, index_col=0, parse_dates=True)
+                prices_df = _load_csv(str(prices_path), index_col=0, parse_dates=True)
                 nm = dict(zip(sdf['ticker'], sdf['company_name']))
 
                 # Approximate historical market cap: price × (current_mcap / current_price)
@@ -321,8 +328,8 @@ with tab_mcap:
                         for t in mcap_df.columns:
                             if t not in top_t:
                                 nv = mcap_df[t] / mcap_df[t].iloc[0] * 100
-                                x_bg_n.extend(list(mcap_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                                x_bg_a.extend(list(mcap_df.index) + [None]); y_bg_a.extend(list(mcap_df[t]) + [None])
+                                x_bg_n.extend(list(mcap_df.index[::_BG_STEP]) + [None]); y_bg_n.extend(list(nv.iloc[::_BG_STEP]) + [None])
+                                x_bg_a.extend(list(mcap_df.index[::_BG_STEP]) + [None]); y_bg_a.extend(list(mcap_df[t].iloc[::_BG_STEP]) + [None])
                         if x_bg_n:
                             for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                                 fig_ts.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -388,8 +395,8 @@ with tab_prices:
     signals_path = run_dir / 'signals.csv'
     prices_path  = run_dir / 'prices.csv'
     if prices_path.exists() and signals_path.exists():
-        prices_df = pd.read_csv(prices_path, index_col=0, parse_dates=True)
-        sdf_full  = pd.read_csv(signals_path)
+        prices_df = _load_csv(str(prices_path), index_col=0, parse_dates=True)
+        sdf_full  = _load_csv(str(signals_path))
         nm        = dict(zip(sdf_full['ticker'], sdf_full.get('company_name', sdf_full['ticker'])))
 
         COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
@@ -406,10 +413,10 @@ with tab_prices:
             for t in prices_df.columns:
                 if t not in top_t:
                     norm_v = prices_df[t] / prices_df[t].iloc[0] * 100
-                    x_bg_n.extend(list(prices_df.index) + [None])
-                    y_bg_n.extend(list(norm_v) + [None])
-                    x_bg_a.extend(list(prices_df.index) + [None])
-                    y_bg_a.extend(list(prices_df[t]) + [None])
+                    x_bg_n.extend(list(prices_df.index[::_BG_STEP]) + [None])
+                    y_bg_n.extend(list(norm_v.iloc[::_BG_STEP]) + [None])
+                    x_bg_a.extend(list(prices_df.index[::_BG_STEP]) + [None])
+                    y_bg_a.extend(list(prices_df[t].iloc[::_BG_STEP]) + [None])
             if x_bg_n:
                 for row, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                     fig.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -480,8 +487,8 @@ with tab_volume:
     if not volume_path.exists():
         st.info('volume.csv not found — re-run the bot to enable this tab.')
     else:
-        vol_df = pd.read_csv(volume_path, index_col=0, parse_dates=True)
-        sdf_vol = pd.read_csv(run_dir / 'signals.csv') if (run_dir / 'signals.csv').exists() else None
+        vol_df = _load_csv(str(volume_path), index_col=0, parse_dates=True)
+        sdf_vol = _load_csv(str(run_dir / "signals.csv")) if (run_dir / 'signals.csv').exists() else None
         nm_vol  = dict(zip(sdf_vol['ticker'], sdf_vol['company_name'])) if sdf_vol is not None and 'company_name' in sdf_vol.columns else {}
 
         COLORS_V = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
@@ -496,8 +503,8 @@ with tab_volume:
                 if t not in top_t:
                     first = vol_df[t].replace(0, float('nan')).first_valid_index()
                     nv = vol_df[t] / vol_df[t][first] * 100 if first else vol_df[t] * 0
-                    x_bg_n.extend(list(vol_df.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                    x_bg_a.extend(list(vol_df.index) + [None]); y_bg_a.extend(list(vol_df[t]) + [None])
+                    x_bg_n.extend(list(vol_df.index[::_BG_STEP]) + [None]); y_bg_n.extend(list(nv.iloc[::_BG_STEP]) + [None])
+                    x_bg_a.extend(list(vol_df.index[::_BG_STEP]) + [None]); y_bg_a.extend(list(vol_df[t].iloc[::_BG_STEP]) + [None])
             if x_bg_n:
                 for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
                     fig_v.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
@@ -553,8 +560,8 @@ with tab_returns:
     if not prices_path_r.exists():
         st.info('prices.csv not found — re-run the bot to enable this tab.')
     else:
-        ret_prices = pd.read_csv(prices_path_r, index_col=0, parse_dates=True)
-        sdf_r = pd.read_csv(run_dir / 'signals.csv') if (run_dir / 'signals.csv').exists() else None
+        ret_prices = _load_csv(str(prices_path_r), index_col=0, parse_dates=True)
+        sdf_r = _load_csv(str(run_dir / "signals.csv")) if (run_dir / 'signals.csv').exists() else None
         nm_r  = dict(zip(sdf_r['ticker'], sdf_r['company_name'])) if sdf_r is not None and 'company_name' in sdf_r.columns else {}
 
         # Top subplot  — cumulative return in %:  (price/price[0] - 1) * 100  (starts at 0)
@@ -576,8 +583,8 @@ with tab_returns:
         x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
         for t in ret_prices.columns:
             if t not in top_t_r:
-                x_bg_p.extend(list(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
-                x_bg_u.extend(list(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
+                x_bg_p.extend(list(cum_pct.index[::_BG_STEP]) + [None]); y_bg_p.extend(list(cum_pct[t].iloc[::_BG_STEP]) + [None])
+                x_bg_u.extend(list(cum_usd.index[::_BG_STEP]) + [None]); y_bg_u.extend(list(cum_usd[t].iloc[::_BG_STEP]) + [None])
         if x_bg_p:
             for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
                 fig_r.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
