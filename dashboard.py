@@ -557,60 +557,59 @@ with tab_returns:
         sdf_r = pd.read_csv(run_dir / 'signals.csv') if (run_dir / 'signals.csv').exists() else None
         nm_r  = dict(zip(sdf_r['ticker'], sdf_r['company_name'])) if sdf_r is not None and 'company_name' in sdf_r.columns else {}
 
-        # Cumulative return: (price / price[0]) - 1, expressed as %
-        cum_ret = (ret_prices / ret_prices.iloc[0] - 1) * 100
+        # Top subplot  — cumulative return in %:  (price/price[0] - 1) * 100  (starts at 0)
+        # Bottom subplot — dollar return ($):      price - price[0]             (starts at $0)
+        cum_pct = (ret_prices / ret_prices.iloc[0] - 1) * 100
+        cum_usd = ret_prices - ret_prices.iloc[0]
 
-        # Highlight: top N by final cumulative return
-        by_return = cum_ret.iloc[-1].sort_values(ascending=False).index.tolist()
-        top_t_r   = by_return[:TOP_N_HIGHLIGHT]
+        # Highlight: top N by final cumulative % return
+        top_t_r = cum_pct.iloc[-1].sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
         COLORS_R = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
                     '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
                     '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
 
         fig_r = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                              subplot_titles=['Normalized price (base = 100)',
-                                             'Cumulative return (%)'])
+                              subplot_titles=['Cumulative return (%)',
+                                             'Dollar return ($ per share)'])
 
-        # Background gray traces
-        x_bg_n, y_bg_n, x_bg_a, y_bg_a = [], [], [], []
+        x_bg_p, y_bg_p, x_bg_u, y_bg_u = [], [], [], []
         for t in ret_prices.columns:
             if t not in top_t_r:
-                nv = ret_prices[t] / ret_prices[t].iloc[0] * 100
-                x_bg_n.extend(list(ret_prices.index) + [None]); y_bg_n.extend(list(nv) + [None])
-                x_bg_a.extend(list(cum_ret.index) + [None]);    y_bg_a.extend(list(cum_ret[t]) + [None])
-        if x_bg_n:
-            for rn, xb, yb in [(1, x_bg_n, y_bg_n), (2, x_bg_a, y_bg_a)]:
+                x_bg_p.extend(list(cum_pct.index) + [None]); y_bg_p.extend(list(cum_pct[t]) + [None])
+                x_bg_u.extend(list(cum_usd.index) + [None]); y_bg_u.extend(list(cum_usd[t]) + [None])
+        if x_bg_p:
+            for rn, xb, yb in [(1, x_bg_p, y_bg_p), (2, x_bg_u, y_bg_u)]:
                 fig_r.add_trace(go.Scatter(x=xb, y=yb, mode='lines',
                                            line=dict(color='lightgray', width=0.5),
                                            showlegend=False, hoverinfo='skip'), row=rn, col=1)
 
         for i, t in enumerate(top_t_r):
             company = nm_r.get(t, t)
-            nv      = ret_prices[t] / ret_prices[t].iloc[0] * 100
             color   = COLORS_R[i % len(COLORS_R)]
             fig_r.add_trace(go.Scatter(
-                x=ret_prices.index, y=nv, mode='lines', name=t,
+                x=cum_pct.index, y=cum_pct[t], mode='lines', name=t,
                 line=dict(color=color, width=1.8),
                 hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                               '%{x|%Y-%m-%d}<br>Norm.: %{y:,.2f}<extra></extra>'),
+                               '%{x|%Y-%m-%d}<br>Return: %{y:+.2f}%<extra></extra>'),
             ), row=1, col=1)
             fig_r.add_trace(go.Scatter(
-                x=cum_ret.index, y=cum_ret[t], mode='lines', name=t,
+                x=cum_usd.index, y=cum_usd[t], mode='lines', name=t,
                 line=dict(color=color, width=1.8), showlegend=False,
                 hovertemplate=(f'<b>{company}</b> ({t})<br>'
-                               '%{x|%Y-%m-%d}<br>Return: %{y:+.2f}%<extra></extra>'),
+                               '%{x|%Y-%m-%d}<br>$ return: %{y:+.2f}<extra></extra>'),
             ), row=2, col=1)
 
-        fig_r.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8, row=2, col=1)
+        for rn in [1, 2]:
+            fig_r.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8, row=rn, col=1)
         fig_r.update_layout(
             title=f'Cumulative Returns — Top {TOP_N_HIGHLIGHT} best performers highlighted',
             height=860, hovermode='closest',
             legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
         )
-        fig_r.update_yaxes(title_text='Normalized (base=100)', row=1, col=1)
-        fig_r.update_yaxes(title_text='Cumulative return (%)',  row=2, col=1)
-        fig_r.update_xaxes(title_text='Date',                   row=2, col=1)
+        fig_r.update_yaxes(title_text='Cumulative return (%)',   row=1, col=1)
+        fig_r.update_yaxes(title_text='Dollar return ($/share)', row=2, col=1)
+        fig_r.update_xaxes(title_text='Date',                    row=2, col=1)
         fig_r.update_xaxes(rangeselector=dict(buttons=[
             dict(count=1,  label='1M',  step='month', stepmode='backward'),
             dict(count=3,  label='3M',  step='month', stepmode='backward'),
