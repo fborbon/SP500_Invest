@@ -37,17 +37,27 @@ corr_dir = run_dir / 'Correlation_method'
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 520):
-    """Render a DataFrame as HTML with a synchronised scrollbar on top AND bottom."""
-    # Build per-row inline styles
+def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 520,
+                        link_cols: dict = None):
+    """Render a DataFrame as HTML with a synchronised scrollbar on top AND bottom.
+
+    link_cols: maps column name → URL template with {value} placeholder.
+               e.g. {'ticker': 'https://finance.yahoo.com/quote/{value}'}
+    """
     rows_html = []
     for idx, row in df.iterrows():
         style = row_styles.get(idx, '') if row_styles else ''
-        cells = ''.join(
-            f'<td style="padding:4px 10px;border:1px solid #eee;white-space:nowrap;">{v}</td>'
-            for v in row
-        )
-        rows_html.append(f'<tr style="{style}">{cells}</tr>')
+        cells = []
+        for col, v in zip(df.columns, row):
+            if link_cols and col in link_cols:
+                url = link_cols[col].format(value=v)
+                cell = (f'<td style="padding:4px 10px;border:1px solid #eee;white-space:nowrap;">'
+                        f'<a href="{url}" target="_blank" '
+                        f'style="color:inherit;text-decoration:underline;">{v}</a></td>')
+            else:
+                cell = f'<td style="padding:4px 10px;border:1px solid #eee;white-space:nowrap;">{v}</td>'
+            cells.append(cell)
+        rows_html.append(f'<tr style="{style}">{"".join(cells)}</tr>')
 
     headers = ''.join(
         f'<th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;'
@@ -155,7 +165,8 @@ with tab_signals:
             elif sig:
                 row_styles[i] = sig
 
-        _dual_scroll_table(df.reset_index(drop=True), row_styles, height=500)
+        _dual_scroll_table(df.reset_index(drop=True), row_styles, height=500,
+                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'})
         st.caption(
             f'🔵 Top {TOP_N_HIGHLIGHT} highest predicted return  '
             '🟢 BUY  🔴 SELL  🟡 HOLD'
@@ -212,7 +223,8 @@ with tab_fund:
                 except Exception:
                     pass
 
-        _dual_scroll_table(df.reset_index(), row_styles, height=540)
+        _dual_scroll_table(df.reset_index(), row_styles, height=540,
+                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'})
         st.caption('🟢 ≥70%  🟡 ≥50%  🔴 <50%  likelihood of price increase in 12 months')
 
 
