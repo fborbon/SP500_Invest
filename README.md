@@ -5,7 +5,7 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term price m
 ## Requirements
 
 ```bash
-pip install ib_insync pandas numpy scikit-learn matplotlib requests yfinance nest_asyncio
+pip install ib_insync pandas numpy scikit-learn matplotlib requests yfinance streamlit nest_asyncio
 ```
 
 - Interactive Brokers TWS or IB Gateway running locally (only needed to place orders)
@@ -35,6 +35,20 @@ python main.py live 50
 ```
 
 Or use `Main.ipynb` in Jupyter — set `n_tickers` and `mode` in the run cell.
+
+### Dashboard
+
+After running the bot, launch the dashboard to explore results interactively:
+
+```bash
+streamlit run dashboard.py
+```
+
+Opens in your browser at `http://localhost:8501`. Use the sidebar to switch between runs. Four tabs:
+- **Signals** — colour-coded BUY/SELL/HOLD table
+- **Fundamentals** — 10-metric scoring table with likelihood_pct highlighted
+- **Price Series & Market Cap** — all charts from `General/`
+- **Correlation Analysis** — heatmap + per-ticker prediction charts
 
 ## File Structure
 
