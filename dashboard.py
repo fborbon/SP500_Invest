@@ -530,7 +530,8 @@ with tab_mcap:
 
                 if not mcap_df.empty:
                     by_abs  = [t for t in sdf['ticker'] if t in mcap_df.columns][:TOP_N_HIGHLIGHT]
-                    by_norm = (mcap_df.iloc[-1] / mcap_df.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+                    _mcap_f = mcap_df.loc[mcap_df.index >= pd.Timestamp(_CHART_START_DATE)]
+                    by_norm = (_mcap_f.iloc[-1] / _mcap_f.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
                     st.divider()
                     st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap')
@@ -606,7 +607,8 @@ with tab_volume:
             return s / s[first] * 100 if first is not None else s * 0
 
         by_abs_v  = vol_df.mean().sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
-        by_norm_v = (vol_df.iloc[-1] / vol_df.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+        _vol_f    = vol_df.loc[vol_df.index >= pd.Timestamp(_CHART_START_DATE)]
+        by_norm_v = (_vol_f.iloc[-1] / _vol_f.replace(0, float('nan')).iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
         _echarts_dual_chart(
@@ -635,7 +637,8 @@ with tab_returns:
         sdf_r = _load_csv(str(run_dir / "signals.csv")) if (run_dir / 'signals.csv').exists() else None
         nm_r  = dict(zip(sdf_r['ticker'], sdf_r['company_name'])) if sdf_r is not None and 'company_name' in sdf_r.columns else {}
 
-        top_t_r = ((ret_prices.iloc[-1] / ret_prices.iloc[0] - 1) * 100).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+        _ret_f  = ret_prices.loc[ret_prices.index >= pd.Timestamp(_CHART_START_DATE)]
+        top_t_r = ((_ret_f.iloc[-1] / _ret_f.iloc[0] - 1) * 100).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
         _echarts_dual_chart(
             ret_prices, top_t_r, nm_r,
