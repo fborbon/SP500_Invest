@@ -332,12 +332,22 @@ def plot_prediction_analysis(target: str, returns, prices_df,
     # ── Right: normalized price time series ──────────────────────────────────
     plot_tickers = [t for t in top5 if t in prices_df.columns]
 
+    # Trim to target's first valid date so the x-axis has no empty space on the left
+    if target in prices_df.columns:
+        first_valid = prices_df[target].first_valid_index()
+        if first_valid is not None:
+            prices_df = prices_df.loc[first_valid:]
+
+    n_right = len(prices_df)
+    fg_s    = _step(n_right, _MAX_FG_PTS)
+
     def normalize(series):
-        return series / series.iloc[0] * 100
+        first = series.first_valid_index()
+        return series / series[first] * 100 if first is not None else series
 
     if target in prices_df.columns:
         fig.add_trace(go.Scatter(
-            x=_dt(prices_df.index), y=normalize(prices_df[target]), mode='lines',
+            x=_dt(prices_df.index[::fg_s]), y=normalize(prices_df[target]).iloc[::fg_s], mode='lines',
             name=f'{target} (target)', line=dict(color='black', width=2.5),
         ), row=1, col=2)
 
@@ -346,7 +356,7 @@ def plot_prediction_analysis(target: str, returns, prices_df,
         direction = '↑' if r > 0 else '↓'
         dash      = 'solid' if r > 0 else 'dash'
         fig.add_trace(go.Scatter(
-            x=_dt(prices_df.index), y=normalize(prices_df[ticker]), mode='lines',
+            x=_dt(prices_df.index[::fg_s]), y=normalize(prices_df[ticker]).iloc[::fg_s], mode='lines',
             name=f'{direction} {ticker}  r={r:+.2f}',
             line=dict(color=COLORS[i % len(COLORS)], dash=dash, width=1.4),
         ), row=1, col=2)
