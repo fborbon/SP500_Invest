@@ -172,34 +172,50 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
 
 
 def _chart_title(title: str, tooltip: str):
-    """Render a subheader with a 2-second hover tooltip explaining the chart."""
-    tip_json = json.dumps(tooltip)   # safe JSON escaping for embedding in JS
+    """Render a subheader with a 2-second hover tooltip that appears in the parent page."""
+    tip_json = json.dumps(tooltip)
     html = f"""<!DOCTYPE html><html><head><style>
 body{{margin:0;padding:0;font-family:"Source Sans Pro",sans-serif;}}
 .ttl{{font-size:1.05rem;font-weight:600;color:#0f0f0f;cursor:default;
       display:inline-block;padding:2px 0 3px;
       border-bottom:2px dashed #bbb;line-height:1.3;}}
-#tip{{position:fixed;background:#222;color:#f5f5f5;padding:9px 13px;
-      border-radius:6px;font-size:13px;max-width:340px;line-height:1.5;
-      z-index:9999;pointer-events:none;display:none;white-space:normal;
-      box-shadow:0 2px 8px rgba(0,0,0,0.35);}}
 </style></head><body>
-<div id="tip"></div>
 <div class="ttl" id="ttl">{title}</div>
 <script>
-var tip=document.getElementById('tip');
-var el=document.getElementById('ttl');
-var msg={tip_json};
-var timer=null;
-el.addEventListener('mouseenter',function(){{
-  timer=setTimeout(function(){{tip.textContent=msg;tip.style.display='block';}},2000);
+// Inject a single global tooltip div into the parent Streamlit page
+var pdoc = window.parent.document;
+var tip = pdoc.getElementById('__chart_tip__');
+if (!tip) {{
+  tip = pdoc.createElement('div');
+  tip.id = '__chart_tip__';
+  tip.style.cssText = 'position:fixed;background:#222;color:#f5f5f5;padding:9px 13px;' +
+    'border-radius:6px;font-size:13px;max-width:360px;line-height:1.5;z-index:99999;' +
+    'pointer-events:none;display:none;white-space:normal;' +
+    'box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+  pdoc.body.appendChild(tip);
+}}
+
+var el = document.getElementById('ttl');
+var msg = {tip_json};
+var timer = null;
+
+el.addEventListener('mouseenter', function() {{
+  timer = setTimeout(function() {{
+    tip.textContent = msg;
+    tip.style.display = 'block';
+  }}, 2000);
 }});
-el.addEventListener('mousemove',function(e){{
-  tip.style.left=(e.clientX+14)+'px';
-  tip.style.top=(e.clientY+14)+'px';
+
+el.addEventListener('mousemove', function(e) {{
+  // Translate iframe-local coords to parent-page coords
+  var fr = window.frameElement ? window.frameElement.getBoundingClientRect() : {{left:0,top:0}};
+  tip.style.left = (fr.left + e.clientX + 16) + 'px';
+  tip.style.top  = (fr.top  + e.clientY - 10) + 'px';
 }});
-el.addEventListener('mouseleave',function(){{
-  clearTimeout(timer);tip.style.display='none';
+
+el.addEventListener('mouseleave', function() {{
+  clearTimeout(timer);
+  tip.style.display = 'none';
 }});
 </script>
 </body></html>"""
