@@ -150,14 +150,33 @@ _COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
            '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5']
 
 
+def _y_bounds(tickers, fn, df, margin=0.05):
+    """Return {'min': ..., 'max': ...} from highlighted series only, with a small margin."""
+    vals = []
+    for t in tickers:
+        if t not in df.columns:
+            continue
+        try:
+            s = fn(df[t]).replace([float('inf'), float('-inf')], float('nan')).dropna()
+            vals.extend(s.tolist())
+        except Exception:
+            pass
+    if not vals:
+        return {}
+    lo, hi = min(vals), max(vals)
+    pad = (hi - lo) * margin if hi != lo else abs(hi) * margin or 1
+    return {'min': round(lo - pad, 4), 'max': round(hi + pad, 4)}
+
+
 def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
                         title, y1_label, y2_label, height=880,
-                        start_date=_CHART_START_DATE, top_t_bottom=None):
+                        start_date=_CHART_START_DATE, top_t_bottom=None,
+                        fit_to_highlights=True):
     """Two-subplot ECharts time series with native y-axis auto-scaling on x-zoom.
 
-    top_t_bottom: if provided, the bottom subplot highlights these tickers instead of top_t.
-    dataZoom filterMode='filter' makes ECharts automatically rescale both
-    y-axes whenever the x range changes — no JavaScript callbacks needed.
+    top_t_bottom:      if provided, the bottom subplot highlights these tickers instead of top_t.
+    fit_to_highlights: if True, y-axis limits are set from highlighted series only;
+                       gray lines may extend outside the visible range.
     """
     if start_date:
         df_all = df_all.loc[df_all.index >= pd.Timestamp(start_date)]
@@ -273,12 +292,14 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
              'axisLabel': {'formatter': '{yyyy}-{MM}', 'fontSize': 9}},
         ],
         'yAxis': [
-            {'type': 'value', 'gridIndex': 0, 'name': y1_label, 'scale': True,
-             'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
-             'splitLine': {'lineStyle': {'opacity': 0.3}}},
-            {'type': 'value', 'gridIndex': 1, 'name': y2_label, 'scale': True,
-             'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
-             'splitLine': {'lineStyle': {'opacity': 0.3}}},
+            {**{'type': 'value', 'gridIndex': 0, 'name': y1_label, 'scale': True,
+                'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
+                'splitLine': {'lineStyle': {'opacity': 0.3}}},
+             **(_y_bounds(top_t,       norm_fn, df_all) if fit_to_highlights else {})},
+            {**{'type': 'value', 'gridIndex': 1, 'name': y2_label, 'scale': True,
+                'nameTextStyle': {'fontSize': 9}, 'axisLabel': {'fontSize': 9},
+                'splitLine': {'lineStyle': {'opacity': 0.3}}},
+             **(_y_bounds(top_t_bottom, abs_fn, df_all) if fit_to_highlights else {})},
         ],
         'series': series,
     }
@@ -622,8 +643,10 @@ with tab_volume:
             return s / s[first] * 100 if first is not None else s * 0
 
         by_abs_v  = vol_df.mean().sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
-        _vol_f    = vol_df.loc[vol_df.index >= pd.Timestamp(_CHART_START_DATE)]
-        by_norm_v = (_vol_f.iloc[-1] / _vol_f.replace(0, float('nan')).iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
+        # Sort by last value of _vol_norm — matches the highest visible lines in the top subplot
+        _norm_last = {t: _vol_norm(vol_df[t]).iloc[-1] for t in vol_df.columns}
+        by_norm_v  = sorted(_norm_last, key=lambda t: _norm_last[t] if pd.notna(_norm_last[t]) else 0,
+                            reverse=True)[:TOP_N_HIGHLIGHT]
 
         st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
         _echarts_dual_chart(
