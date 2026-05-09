@@ -129,7 +129,7 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
             tipTimer=setTimeout(()=>{{
               tip.textContent=th.getAttribute('data-tip');
               tip.style.display='block';
-            }},4000);
+            }},2000);
           }});
           th.addEventListener('mousemove',e=>{{
             tip.style.left=(e.clientX+14)+'px';
