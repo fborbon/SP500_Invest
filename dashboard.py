@@ -152,14 +152,18 @@ _COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
 
 def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
                         title, y1_label, y2_label, height=880,
-                        start_date=_CHART_START_DATE):
+                        start_date=_CHART_START_DATE, top_t_bottom=None):
     """Two-subplot ECharts time series with native y-axis auto-scaling on x-zoom.
 
+    top_t_bottom: if provided, the bottom subplot highlights these tickers instead of top_t.
     dataZoom filterMode='filter' makes ECharts automatically rescale both
     y-axes whenever the x range changes — no JavaScript callbacks needed.
     """
     if start_date:
         df_all = df_all.loc[df_all.index >= pd.Timestamp(start_date)]
+
+    if top_t_bottom is None:
+        top_t_bottom = top_t
 
     def _clean(v):
         try:
@@ -168,7 +172,9 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
         except Exception:
             return None
 
-    top_set = set(top_t)
+    top_set_n = set(top_t)           # excluded from top subplot background
+    top_set_a = set(top_t_bottom)    # excluded from bottom subplot background
+    all_highlighted = top_set_n | top_set_a
     dates    = df_all.index.strftime('%Y-%m-%d').tolist()
 
     # Adaptive step: target ≤ _BG_TARGET_PTS points per background trace
@@ -177,10 +183,11 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
 
     series = []
 
-    # ── Background gray traces (downsampled, not in legend) ──────────────────
-    bg_tickers = [t for t in df_all.columns if t not in top_set]
+    # ── Background gray traces — separate per subplot so each excludes its own highlights ──
     bg_n, bg_a = [], []
-    for t in bg_tickers:
+    for t in df_all.columns:
+        if t in all_highlighted:
+            continue
         try:
             nv = norm_fn(df_all[t]).iloc[::bg_step]
             av = abs_fn(df_all[t]).iloc[::bg_step]
@@ -202,16 +209,14 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
                 'large': True, 'largeThreshold': 200,
             })
 
-    # ── Highlighted top-N traces (same name links both subplots in legend) ───
+    # ── Top subplot highlights ────────────────────────────────────────────────
     for i, t in enumerate(top_t):
         if t not in df_all.columns:
             continue
         color = _COLORS[i % len(_COLORS)]
         try:
             nv = norm_fn(df_all[t])
-            av = abs_fn(df_all[t])
             norm_data = [[dates[j], _clean(nv.iloc[j])] for j in range(len(dates))]
-            abs_data  = [[dates[j], _clean(av.iloc[j])]  for j in range(len(dates))]
         except Exception:
             continue
         series.append({
@@ -220,11 +225,25 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
             'lineStyle': {'color': color, 'width': 1.8},
             'itemStyle': {'color': color},
         })
+
+    # ── Bottom subplot highlights ─────────────────────────────────────────────
+    for i, t in enumerate(top_t_bottom):
+        if t not in df_all.columns:
+            continue
+        color = _COLORS[i % len(_COLORS)]
+        try:
+            av = abs_fn(df_all[t])
+            abs_data = [[dates[j], _clean(av.iloc[j])] for j in range(len(dates))]
+        except Exception:
+            continue
+        # Only add to legend if not already there (i.e. not in top_t)
+        in_legend = t in top_set_n
         series.append({
             'name': t, 'type': 'line', 'xAxisIndex': 1, 'yAxisIndex': 1,
             'data': abs_data, 'symbol': 'none',
             'lineStyle': {'color': color, 'width': 1.8},
             'itemStyle': {'color': color},
+            'legendHoverLink': not in_legend,
         })
 
     option = {
@@ -233,7 +252,7 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
         'title': {'text': title, 'textStyle': {'fontSize': 12, 'fontWeight': 'bold'}, 'top': 2},
         'legend': {
             'type': 'scroll', 'top': 28,
-            'data': [{'name': t, 'icon': 'circle'} for t in top_t if t in df_all.columns],
+            'data': [{'name': t, 'icon': 'circle'} for t in dict.fromkeys(list(top_t) + list(top_t_bottom)) if t in df_all.columns],
             'itemWidth': 10, 'itemHeight': 10,
             'textStyle': {'fontSize': 10},
         },
@@ -268,7 +287,7 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
     }
 
     opt_json  = json.dumps(option)
-    nm_json   = json.dumps({t: nm.get(t, t) for t in top_t})
+    nm_json   = json.dumps({t: nm.get(t, t) for t in dict.fromkeys(list(top_t) + list(top_t_bottom))})
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="{_ECHARTS_CDN}"></script>
