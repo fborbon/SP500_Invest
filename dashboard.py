@@ -22,6 +22,8 @@ _BG_STEP = 5
 # Max background tickers per chart and target points per background trace
 _MAX_BG_TICKERS = 100
 _BG_TARGET_PTS  = 200
+# Default start date for all time series charts (slices data before building JSON)
+_CHART_START_DATE = '2005-01-01'
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -150,12 +152,16 @@ _COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
 
 
 def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
-                        title, y1_label, y2_label, height=880):
+                        title, y1_label, y2_label, height=880,
+                        start_date=_CHART_START_DATE):
     """Two-subplot ECharts time series with native y-axis auto-scaling on x-zoom.
 
     dataZoom filterMode='filter' makes ECharts automatically rescale both
     y-axes whenever the x range changes — no JavaScript callbacks needed.
     """
+    if start_date:
+        df_all = df_all.loc[df_all.index >= pd.Timestamp(start_date)]
+
     def _clean(v):
         try:
             f = float(v)
