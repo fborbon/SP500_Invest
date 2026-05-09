@@ -19,9 +19,8 @@ def _load_csv(path, **kwargs):
 
 # Minimum downsample step for background traces; actual step is computed adaptively
 _BG_STEP = 5
-# Max background tickers per chart and target points per background trace
-_MAX_BG_TICKERS = 100
-_BG_TARGET_PTS  = 200
+# Target points per background trace (adaptive downsampling)
+_BG_TARGET_PTS = 200
 # Default start date for all time series charts (slices data before building JSON)
 _CHART_START_DATE = '2005-01-01'
 
@@ -179,7 +178,7 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
     series = []
 
     # ── Background gray traces (downsampled, not in legend) ──────────────────
-    bg_tickers = [t for t in df_all.columns if t not in top_set][:_MAX_BG_TICKERS]
+    bg_tickers = [t for t in df_all.columns if t not in top_set]
     bg_n, bg_a = [], []
     for t in bg_tickers:
         try:
