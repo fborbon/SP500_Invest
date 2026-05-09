@@ -171,6 +171,41 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
     components.html(full_html, height=height + 30, scrolling=False)
 
 
+def _chart_title(title: str, tooltip: str):
+    """Render a subheader with a 2-second hover tooltip explaining the chart."""
+    tip_json = json.dumps(tooltip)   # safe JSON escaping for embedding in JS
+    html = f"""<!DOCTYPE html><html><head><style>
+body{{margin:0;padding:0;font-family:"Source Sans Pro",sans-serif;}}
+.ttl{{font-size:1.05rem;font-weight:600;color:#0f0f0f;cursor:default;
+      display:inline-block;padding:2px 0 3px;
+      border-bottom:2px dashed #bbb;line-height:1.3;}}
+#tip{{position:fixed;background:#222;color:#f5f5f5;padding:9px 13px;
+      border-radius:6px;font-size:13px;max-width:340px;line-height:1.5;
+      z-index:9999;pointer-events:none;display:none;white-space:normal;
+      box-shadow:0 2px 8px rgba(0,0,0,0.35);}}
+</style></head><body>
+<div id="tip"></div>
+<div class="ttl" id="ttl">{title}</div>
+<script>
+var tip=document.getElementById('tip');
+var el=document.getElementById('ttl');
+var msg={tip_json};
+var timer=null;
+el.addEventListener('mouseenter',function(){{
+  timer=setTimeout(function(){{tip.textContent=msg;tip.style.display='block';}},2000);
+}});
+el.addEventListener('mousemove',function(e){{
+  tip.style.left=(e.clientX+14)+'px';
+  tip.style.top=(e.clientY+14)+'px';
+}});
+el.addEventListener('mouseleave',function(){{
+  clearTimeout(timer);tip.style.display='none';
+}});
+</script>
+</body></html>"""
+    components.html(html, height=38, scrolling=False)
+
+
 _ECHARTS_CDN = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
 _COLORS = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
            '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
@@ -610,7 +645,10 @@ with tab_mcap:
             )
             fig.update_yaxes(title_text='Price ($)',       row=1, col=1)
             fig.update_yaxes(title_text='Market Cap ($B)', row=2, col=1)
-            st.subheader('Market Cap Bars (interactive — hover for company name)')
+            _chart_title('Market Cap Bars — hover bars for details',
+                'Bar chart comparing the last closing price (top) and current market capitalisation in $B (bottom) '
+                f'for the top {TOP_N_HIGHLIGHT} and bottom {TOP_N_HIGHLIGHT} S&P 500 companies by market cap. '
+                'Hover any bar to see company name, sector, price and cap. Green = top companies, red = bottom.')
             st.plotly_chart(fig, use_container_width=True)
 
             # ── Market cap time series ────────────────────────────────────────
@@ -634,7 +672,11 @@ with tab_mcap:
                     by_norm = (_mcap_f.iloc[-1] / _mcap_f.iloc[0]).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
                     st.divider()
-                    st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap')
+                    _chart_title(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Current Market Cap',
+                        f'Estimated historical market capitalisation for the {TOP_N_HIGHLIGHT} largest S&P 500 companies today. '
+                        'Approximated as: price × (current_market_cap / current_price). '
+                        'Top subplot: normalised to base=100 at the first data point (relative growth). '
+                        'Bottom subplot: absolute market cap in $B. Gray lines = all other S&P 500 companies.')
                     _echarts_dual_chart(
                         mcap_df, by_abs, nm,
                         norm_fn=lambda s: s / s.iloc[0] * 100,
@@ -643,7 +685,11 @@ with tab_mcap:
                         y1_label='Normalized (base=100)', y2_label='Market Cap ($B)',
                     )
                     st.divider()
-                    st.subheader(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth')
+                    _chart_title(f'Market Cap Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Cap Growth',
+                        f'Same data as above, but highlights the {TOP_N_HIGHLIGHT} companies with the highest '
+                        f'market cap growth since {_CHART_START_DATE} (measured as last / first value in the chart window). '
+                        'These are the fastest-growing companies by capitalisation, not necessarily the largest today. '
+                        'Top subplot: normalised growth. Bottom subplot: absolute cap in $B.')
                     _echarts_dual_chart(
                         mcap_df, by_norm, nm,
                         norm_fn=lambda s: s / s.iloc[0] * 100,
@@ -679,13 +725,27 @@ with tab_prices:
         _chart_args = dict(norm_fn=lambda s: s / s.iloc[0] * 100, abs_fn=lambda s: s,
                            y1_label='Normalized (base=100)', y2_label='Close price ($)')
 
-        for ordering, title in [
-            (by_mcap,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap'),
-            (by_price,      f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price'),
-            (by_norm_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Stock Price'),
-            (by_norm,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return (full history)'),
-        ]:
+        _price_charts = [
+            (by_mcap,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap',
+             f'Highlights the {TOP_N_HIGHLIGHT} largest S&P 500 companies by current market cap. '
+             f'Top subplot: price normalised to base=100 at {_CHART_START_DATE} (shows relative growth). '
+             'Bottom subplot: absolute closing price in $. Gray lines = all other companies.'),
+            (by_price,      f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price',
+             f'Highlights the {TOP_N_HIGHLIGHT} companies with the highest absolute closing price today (e.g. NVR, BKNG). '
+             'Note: a high share price does not imply a large company — it depends on the number of shares outstanding. '
+             'Top: normalised. Bottom: absolute $ price.'),
+            (by_norm_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Stock Price',
+             f'Highlights the {TOP_N_HIGHLIGHT} best-performing stocks since {_CHART_START_DATE}, '
+             f'ranked by price growth within the chart window (last price / first price since {_CHART_START_DATE}). '
+             'These are the strongest performers over the displayed period. Top: normalised. Bottom: absolute price.'),
+            (by_norm,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return (full history)',
+             f'Highlights the {TOP_N_HIGHLIGHT} best-performing stocks measured from their first available data point '
+             '(since IPO), not just since 2005. Companies that IPO\'d early and grew enormously rank highest here. '
+             'Top: normalised. Bottom: absolute price.'),
+        ]
+        for ordering, title, tip in _price_charts:
             top_t = [t for t in ordering if t in prices_df.columns][:TOP_N_HIGHLIGHT]
+            _chart_title(title, tip)
             _echarts_dual_chart(prices_df, top_t, nm, title=title, **_chart_args)
             st.divider()
     else:
@@ -712,7 +772,11 @@ with tab_volume:
         by_norm_v  = sorted(_norm_last, key=lambda t: _norm_last[t] if pd.notna(_norm_last[t]) else 0,
                             reverse=True)[:TOP_N_HIGHLIGHT]
 
-        st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume')
+        _chart_title(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Average Volume',
+            f'Highlights the {TOP_N_HIGHLIGHT} most actively traded S&P 500 stocks by average daily volume. '
+            'Top subplot: volume normalised to base=100 at each company\'s first data point (relative activity trend). '
+            'Bottom subplot: absolute daily trading volume in shares. '
+            'Gray lines = all other companies. High average volume indicates high market liquidity.')
         _echarts_dual_chart(
             vol_df, by_abs_v, nm_vol,
             norm_fn=_vol_norm, abs_fn=lambda s: s,
@@ -720,7 +784,11 @@ with tab_volume:
             y1_label='Normalized (base=100)', y2_label='Volume (shares)',
         )
         st.divider()
-        st.subheader(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth')
+        _chart_title(f'Volume Time Series — Top {TOP_N_HIGHLIGHT} by Normalized Volume Growth',
+            f'Highlights the {TOP_N_HIGHLIGHT} stocks whose trading volume has grown the most '
+            'relative to their own history (ranked by last normalised value — the highest lines in the top subplot). '
+            'A rising volume trend often signals growing investor interest or market activity. '
+            'Top subplot: normalised volume (base=100 at first data point). Bottom: absolute shares traded.')
         _echarts_dual_chart(
             vol_df, by_norm_v, nm_vol,
             norm_fn=_vol_norm, abs_fn=lambda s: s,
@@ -742,6 +810,11 @@ with tab_returns:
         _ret_f  = ret_prices.loc[ret_prices.index >= pd.Timestamp(_CHART_START_DATE)]
         top_t_r = ((_ret_f.iloc[-1] / _ret_f.iloc[0] - 1) * 100).sort_values(ascending=False).index.tolist()[:TOP_N_HIGHLIGHT]
 
+        _chart_title(f'Cumulative Returns — Top {TOP_N_HIGHLIGHT} best performers',
+            f'Highlights the {TOP_N_HIGHLIGHT} stocks with the highest cumulative return since {_CHART_START_DATE}. '
+            'Top subplot: cumulative % return (0% = no change from start). '
+            'Bottom subplot: dollar return per share (absolute price change since the first date in the chart). '
+            'Gray lines = all other S&P 500 companies. A rising line means the stock has gained value since the start.')
         _echarts_dual_chart(
             ret_prices, top_t_r, nm_r,
             norm_fn=lambda s: (s / s.iloc[0] - 1) * 100,
@@ -758,7 +831,12 @@ with tab_corr:
     else:
         matrix_path = corr_dir / 'correlation_matrix.png'
         if matrix_path.exists():
-            st.subheader('Correlation Matrix')
+            _chart_title('Correlation Matrix',
+                f'Pearson correlation matrix for the top {TOP_N_HIGHLIGHT} S&P 500 companies by market cap, '
+                'computed on daily returns over the full price history. '
+                'Red = strong inverse correlation (stocks move in opposite directions). '
+                'Green = strong direct correlation (stocks move together). '
+                'Values close to 0 indicate little or no linear relationship.')
             st.image(str(matrix_path), use_container_width=True)
             st.divider()
         else:
@@ -793,6 +871,12 @@ with tab_corr:
             selected_t = [opt_map[lbl] for lbl in selected_labels]
 
             if selected_t:
+                _chart_title('Price Series — Selected Companies',
+                    'Interactive price chart for the companies chosen above (from the correlation matrix universe). '
+                    'Use this to visually inspect how correlated pairs move together or in opposite directions. '
+                    'Top subplot: price normalised to base=100 (removes price-scale differences). '
+                    'Bottom subplot: absolute closing price in $. '
+                    'Pairs with high positive correlation (green in the matrix) should track each other closely.')
                 _echarts_dual_chart(
                     prices_c[selected_t], selected_t, nm_c,
                     norm_fn=lambda s: s / s.iloc[0] * 100,
