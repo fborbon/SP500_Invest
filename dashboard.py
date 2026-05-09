@@ -568,22 +568,24 @@ with tab_prices:
                              .sort_values(mcap_col, ascending=False)['ticker'].tolist()
                     if mcap_col else list(prices_df.columns))
         by_price = prices_df.iloc[-1].sort_values(ascending=False).index.tolist()
+
+        # Normalized price rank: sort by growth since _CHART_START_DATE (matches chart window)
+        _pf = prices_df.loc[prices_df.index >= pd.Timestamp(_CHART_START_DATE)]
+        by_norm_price = (_pf.iloc[-1] / _pf.iloc[0]).sort_values(ascending=False).index.tolist() if not _pf.empty else by_price
+
         by_norm  = (prices_df.iloc[-1] / prices_df.iloc[0]).sort_values(ascending=False).index.tolist()
 
+        _chart_args = dict(norm_fn=lambda s: s / s.iloc[0] * 100, abs_fn=lambda s: s,
+                           y1_label='Normalized (base=100)', y2_label='Close price ($)')
+
         for ordering, title in [
-            (by_mcap,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap'),
-            (by_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price'),
-            (by_norm,  f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return'),
+            (by_mcap,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Market Cap'),
+            (by_price,      f'Price Series — Top {TOP_N_HIGHLIGHT} by Stock Price'),
+            (by_norm_price, f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Stock Price'),
+            (by_norm,       f'Price Series — Top {TOP_N_HIGHLIGHT} by Normalized Return (full history)'),
         ]:
             top_t = [t for t in ordering if t in prices_df.columns][:TOP_N_HIGHLIGHT]
-            _echarts_dual_chart(
-                prices_df, top_t, nm,
-                norm_fn=lambda s: s / s.iloc[0] * 100,
-                abs_fn=lambda s: s,
-                title=title,
-                y1_label='Normalized (base=100)',
-                y2_label='Close price ($)',
-            )
+            _echarts_dual_chart(prices_df, top_t, nm, title=title, **_chart_args)
             st.divider()
     else:
         st.info('prices.csv not found — re-run the bot to enable interactive charts.')
