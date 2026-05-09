@@ -17,8 +17,11 @@ from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 def _load_csv(path, **kwargs):
     return pd.read_csv(path, **kwargs)
 
-# Downsample step for background traces — keeps every Nth point to reduce render time
+# Minimum downsample step for background traces; actual step is computed adaptively
 _BG_STEP = 5
+# Max background tickers per chart and target points per background trace
+_MAX_BG_TICKERS = 100
+_BG_TARGET_PTS  = 200
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -161,19 +164,21 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
             return None
 
     top_set = set(top_t)
-    dates     = df_all.index.strftime('%Y-%m-%d').tolist()
-    dates_bg  = dates[::_BG_STEP]
+    dates    = df_all.index.strftime('%Y-%m-%d').tolist()
+
+    # Adaptive step: target ≤ _BG_TARGET_PTS points per background trace
+    bg_step  = max(_BG_STEP, len(dates) // _BG_TARGET_PTS)
+    dates_bg = dates[::bg_step]
 
     series = []
 
     # ── Background gray traces (downsampled, not in legend) ──────────────────
+    bg_tickers = [t for t in df_all.columns if t not in top_set][:_MAX_BG_TICKERS]
     bg_n, bg_a = [], []
-    for t in df_all.columns:
-        if t in top_set:
-            continue
+    for t in bg_tickers:
         try:
-            nv = norm_fn(df_all[t]).iloc[::_BG_STEP]
-            av = abs_fn(df_all[t]).iloc[::_BG_STEP]
+            nv = norm_fn(df_all[t]).iloc[::bg_step]
+            av = abs_fn(df_all[t]).iloc[::bg_step]
             for i in range(len(dates_bg)):
                 bg_n.append([dates_bg[i], _clean(nv.iloc[i])])
                 bg_a.append([dates_bg[i], _clean(av.iloc[i])])
