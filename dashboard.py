@@ -172,9 +172,8 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
         except Exception:
             return None
 
-    top_set_n = set(top_t)           # excluded from top subplot background
-    top_set_a = set(top_t_bottom)    # excluded from bottom subplot background
-    all_highlighted = top_set_n | top_set_a
+    top_set_n = set(top_t)
+    top_set_a = set(top_t_bottom)
     dates    = df_all.index.strftime('%Y-%m-%d').tolist()
 
     # Adaptive step: target ≤ _BG_TARGET_PTS points per background trace
@@ -183,11 +182,9 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
 
     series = []
 
-    # ── Background gray traces — separate per subplot so each excludes its own highlights ──
+    # ── Background gray traces — all tickers, colored highlights drawn on top ──
     bg_n, bg_a = [], []
     for t in df_all.columns:
-        if t in all_highlighted:
-            continue
         try:
             nv = norm_fn(df_all[t]).iloc[::bg_step]
             av = abs_fn(df_all[t]).iloc[::bg_step]
