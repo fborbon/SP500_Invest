@@ -1,0 +1,11 @@
+services:
+  dashboard:
+    build: .
+    restart: always
+    ports:
+      - "127.0.0.1:8501:8501"   # only exposed to Nginx, not public
+    volumes:
+      - ./cache:/app/cache       # persist price/volume/mcap parquet cache
+      - ./outputs:/app/outputs   # persist run outputs
+    environment:
+      - TZ=UTC
