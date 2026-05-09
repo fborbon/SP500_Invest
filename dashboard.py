@@ -52,13 +52,13 @@ corr_dir = run_dir / 'Correlation_method'
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 520,
-                        link_cols: dict = None, cell_hrefs: dict = None):
+                        link_cols: dict = None, cell_hrefs: dict = None,
+                        col_descriptions: dict = None):
     """Render a DataFrame as HTML with a synchronised scrollbar on top AND bottom.
 
-    link_cols:  maps column name → URL template with {value} placeholder (all rows).
-                e.g. {'ticker': 'https://finance.yahoo.com/quote/{value}'}
-    cell_hrefs: maps (col_name, row_idx) → href for individual cell links.
-                e.g. {('signal', 3): 'data:image/png;base64,...'}
+    link_cols:        maps column name → URL template with {value} placeholder (all rows).
+    cell_hrefs:       maps (col_name, row_idx) → href for individual cell links.
+    col_descriptions: maps column name → tooltip text shown after 4 s of hovering.
     """
     rows_html = []
     for idx, row in df.iterrows():
@@ -82,9 +82,12 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
             cells.append(cell)
         rows_html.append(f'<tr style="{style}">{"".join(cells)}</tr>')
 
+    desc = col_descriptions or {}
     headers = ''.join(
         f'<th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;'
-        f'white-space:nowrap;position:sticky;top:0;z-index:1;">{c}</th>'
+        f'white-space:nowrap;position:sticky;top:0;z-index:1;'
+        f'{"border-bottom:2px dashed #aaa;" if c in desc else ""}"'
+        f'{f" data-tip=\"{desc[c]}\"" if c in desc else ""}>{c}</th>'
         for c in df.columns
     )
 
@@ -101,7 +104,11 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
       #top-bar{{overflow-x:scroll;overflow-y:hidden;height:18px;border-bottom:1px solid #ccc;}}
       #top-inner{{height:1px;}}
       #main{{overflow:auto;max-height:{height}px;}}
+      #tip{{position:fixed;background:#333;color:#fff;padding:6px 10px;border-radius:5px;
+            font-size:12px;max-width:260px;line-height:1.4;z-index:9999;
+            pointer-events:none;display:none;white-space:normal;}}
     </style></head><body>
+      <div id="tip"></div>
       <div id="top-bar"><div id="top-inner"></div></div>
       <div id="main">{table_html}</div>
       <script>
@@ -113,6 +120,26 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
         if(window.ResizeObserver){{new ResizeObserver(sync).observe(m);}}
         t.addEventListener('scroll',()=>m.scrollLeft=t.scrollLeft);
         m.addEventListener('scroll',()=>t.scrollLeft=m.scrollLeft);
+
+        // ── Column header tooltips (4-second delay) ─────────────────────────
+        const tip=document.getElementById('tip');
+        let tipTimer=null;
+        document.querySelectorAll('th[data-tip]').forEach(th=>{{
+          th.addEventListener('mouseenter',e=>{{
+            tipTimer=setTimeout(()=>{{
+              tip.textContent=th.getAttribute('data-tip');
+              tip.style.display='block';
+            }},4000);
+          }});
+          th.addEventListener('mousemove',e=>{{
+            tip.style.left=(e.clientX+14)+'px';
+            tip.style.top=(e.clientY+14)+'px';
+          }});
+          th.addEventListener('mouseleave',()=>{{
+            clearTimeout(tipTimer);
+            tip.style.display='none';
+          }});
+        }});
 
         // ── Column sorting ──────────────────────────────────────────────────
         const ths=Array.from(document.querySelectorAll('thead th'));
@@ -454,9 +481,24 @@ with tab_signals:
                     b64 = base64.b64encode(plot.read_bytes()).decode()
                     cell_hrefs[('signal', i)] = f'data:image/png;base64,{b64}'
 
+        _SIGNALS_DESC = {
+            'ticker':                  'Stock ticker symbol (e.g. AAPL). Click to open Yahoo Finance.',
+            'company_name':            'Full legal name of the company.',
+            'sector':                  'GICS sector classification (e.g. Technology, Energy).',
+            'founded':                 'Year the company was founded.',
+            'market_cap_B':            'Current market capitalisation in billions USD.',
+            'current_price':           'Last available closing price (USD).',
+            'target_price_7d':         'Model-predicted price 7 trading days from now.',
+            'predicted_return':        'Expected % return over the next 7 days according to the model.',
+            'model_r2':                'R² of the regression model. Higher = more reliable signal. Values below 0.01 are flagged LOW_CONFIDENCE.',
+            'direct_top5_predictors':  'Top 5 tickers most positively correlated with this stock, used as predictors.',
+            'inverse_top5_predictors': 'Top 5 tickers most negatively correlated with this stock, used as predictors.',
+            'signal':                  'Trading signal. BUY: predicted return > 1%. SELL: predicted return < -10%. HOLD: otherwise. Click to view prediction chart.',
+        }
         _dual_scroll_table(df_reset, row_styles, height=500,
                            link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'},
-                           cell_hrefs=cell_hrefs)
+                           cell_hrefs=cell_hrefs,
+                           col_descriptions=_SIGNALS_DESC)
         st.caption(
             f'🔵 Top {TOP_N_HIGHLIGHT} highest predicted return  '
             '🟢 BUY  🔴 SELL  🟡 HOLD  '
@@ -494,8 +536,30 @@ with tab_fund:
                 except Exception:
                     pass
 
+        _FUND_DESC = {
+            'ticker':          'Stock ticker symbol. Click to open Yahoo Finance.',
+            'company_name':    'Full legal name of the company.',
+            'sector':          'GICS sector classification.',
+            'market_cap_B':    'Market capitalisation in billions USD.',
+            'revenue_growth':  'Year-over-year revenue growth rate (%).',
+            'gross_margin':    'Gross profit as % of revenue. Measures production efficiency.',
+            'operating_margin':'Operating income as % of revenue. Measures operational efficiency.',
+            'net_margin':      'Net income as % of revenue. Bottom-line profitability.',
+            'free_cash_flow':  'Operating cash flow minus capital expenditure (USD). Measures cash generation.',
+            'current_ratio':   'Current assets / current liabilities. >1 means the company can cover short-term obligations.',
+            'debt_to_equity':  'Total debt / shareholders equity. Higher = more leveraged.',
+            'pe_ratio':        'Price-to-Earnings ratio: stock price / EPS. Lower may indicate undervaluation.',
+            'peg_ratio':       'PE ratio / earnings growth rate. Accounts for growth; <1 often considered attractive.',
+            'ps_ratio':        'Price-to-Sales ratio: market cap / revenue.',
+            'pb_ratio':        'Price-to-Book ratio: stock price / book value per share.',
+            'ev_ebitda':       'Enterprise Value / EBITDA. Common valuation multiple; lower = cheaper relative to earnings.',
+            'eps':             'Earnings Per Share: net income / shares outstanding.',
+            'earnings_growth': 'Year-over-year earnings growth rate (%).',
+            'likelihood_pct':  'Composite fundamental score: estimated probability (%) of price increase over the next 12 months. ≥70% green, ≥50% yellow, <50% red.',
+        }
         _dual_scroll_table(df.reset_index(), row_styles, height=540,
-                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'})
+                           link_cols={'ticker': 'https://finance.yahoo.com/quote/{value}'},
+                           col_descriptions=_FUND_DESC)
         st.caption('🟢 ≥70%  🟡 ≥50%  🔴 <50%  likelihood of price increase in 12 months')
 
 
