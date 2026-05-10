@@ -31,7 +31,18 @@ st.set_page_config(
     layout='wide',
 )
 
-st.title('📈 SP500 Correlation Bot — Dashboard')
+st.title('📈 SP500 Correlation Bot')
+st.markdown(
+    """
+    Correlation-based trading signal system for the full **S&P 500** universe.
+    Daily returns are computed for all ~500 companies and Pearson correlations identified.
+    A **Random Forest** regression model predicts each stock's 7-day return using its
+    top correlated peers as features. Signals are classified as **BUY** (predicted return > 1 %),
+    **SELL** (< −10 %) or **HOLD**, enriched with fundamental data, and displayed here
+    alongside interactive price, volume and market-cap time series.
+    """,
+    unsafe_allow_html=False,
+)
 
 # ── Run selector (sidebar) ────────────────────────────────────────────────────
 run_dirs = sorted(
@@ -45,7 +56,6 @@ if not run_dirs:
 
 selected = st.sidebar.selectbox('Select run', [d.name for d in run_dirs], index=0)
 run_dir  = OUTPUTS_DIR / selected
-st.sidebar.caption(f'📁 {run_dir}')
 
 corr_dir = run_dir / 'Correlation_method'
 
