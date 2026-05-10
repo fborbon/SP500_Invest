@@ -44,7 +44,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 echo "=== [7/7] SSL certificate (Let's Encrypt) ==="
 # Make sure DNS A record is already pointing to this server before running this step.
-sudo certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m correoprincipal2021@hotmail.com
+sudo certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m forwardforecasting@gmail.com
 
 echo ""
 echo "=== Setup complete ==="
