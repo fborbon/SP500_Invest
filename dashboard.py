@@ -44,7 +44,7 @@ st.markdown(
     unsafe_allow_html=False,
 )
 
-# ── Run selector (sidebar) ────────────────────────────────────────────────────
+# ── Always use the latest completed run ───────────────────────────────────────
 run_dirs = sorted(
     [d for d in OUTPUTS_DIR.iterdir() if d.is_dir() and not d.name.startswith('.')],
     reverse=True,
@@ -54,8 +54,7 @@ if not run_dirs:
     st.warning('No runs found in outputs/. Run the bot first.')
     st.stop()
 
-selected = st.sidebar.selectbox('Select run', [d.name for d in run_dirs], index=0)
-run_dir  = OUTPUTS_DIR / selected
+run_dir = run_dirs[0]
 
 corr_dir = run_dir / 'Correlation_method'
 

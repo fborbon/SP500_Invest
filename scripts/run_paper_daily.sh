@@ -14,3 +14,8 @@ cd "$APP_DIR"
 docker compose exec -T dashboard python main.py paper >> "$LOG" 2>&1
 
 echo "=== $(date -u) — Done ===" >> "$LOG"
+
+# Keep only the latest run — delete all older output folders
+cd "$APP_DIR/outputs"
+ls -dt */ 2>/dev/null | tail -n +2 | xargs -r sudo rm -rf
+echo "=== $(date -u) — Old runs cleaned ===" >> "$LOG"
