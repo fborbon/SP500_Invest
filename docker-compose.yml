@@ -9,3 +9,10 @@ services:
       - ./outputs:/app/outputs   # persist run outputs
     environment:
       - TZ=UTC
+    command: >
+      streamlit run dashboard.py
+      --server.address=0.0.0.0
+      --server.port=8501
+      --server.headless=true
+      --server.baseUrlPath=SP500bot
+      --browser.gatherUsageStats=false

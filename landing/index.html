@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forward Forecasting</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:    #E1C340;
+      --gold-dk: #b89d28;
+      --bg:      #0c0c12;
+      --card:    #13131f;
+      --border:  #1e1e2e;
+      --text:    #e8e8f0;
+      --muted:   #7a7a9a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 24px 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    header img { width: 44px; height: 44px; }
+    header h1  { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.04em; color: var(--gold); }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 80px 24px 60px;
+    }
+    .hero h2 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.15;
+    }
+    .hero h2 span { color: var(--gold); }
+    .hero p {
+      margin-top: 18px;
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    /* ── Cards ── */
+    .cards {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 0 32px 80px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 32px;
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .25s, transform .2s, box-shadow .25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(225,195,64,.06) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity .25s;
+    }
+    .card:hover { border-color: var(--gold); transform: translateY(-4px);
+                  box-shadow: 0 12px 40px rgba(225,195,64,.15); }
+    .card:hover::before { opacity: 1; }
+
+    .card-icon {
+      width: 52px; height: 52px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      background: rgba(225,195,64,.12);
+    }
+    .card h3  { font-size: 1.25rem; font-weight: 700; }
+    .card p   { font-size: .95rem; color: var(--muted); line-height: 1.6; }
+
+    .badge {
+      display: inline-block;
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: auto;
+      width: fit-content;
+    }
+    .badge-live   { background: rgba(52,211,153,.15); color: #34d399; border: 1px solid rgba(52,211,153,.3); }
+    .badge-soon   { background: rgba(225,195,64,.12); color: var(--gold); border: 1px solid rgba(225,195,64,.3); }
+
+    .card-disabled { cursor: default; pointer-events: none; opacity: .75; }
+    .card-disabled:hover { border-color: var(--border); transform: none; box-shadow: none; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: auto;
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: .85rem;
+      border-top: 1px solid var(--border);
+    }
+    footer span { color: var(--gold); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <img src="logo.png" alt="Forward Forecasting logo">
+    <h1>Forward Forecasting</h1>
+  </header>
+
+  <section class="hero">
+    <h2>Data-driven tools for<br><span>smarter decisions</span></h2>
+    <p>A portfolio of analytical applications spanning financial markets
+       and renewable energy — built with Python, machine learning, and
+       real-world data.</p>
+  </section>
+
+  <div class="cards">
+
+    <a class="card" href="/SP500bot">
+      <div class="card-icon">📈</div>
+      <h3>SP500 Correlation Bot</h3>
+      <p>Correlation-based trading signals for the full S&P 500 universe.
+         Predicts 7-day price targets using Random Forest regression on
+         daily returns, with interactive charts and fundamental analysis.</p>
+      <span class="badge badge-live">● LIVE</span>
+    </a>
+
+    <div class="card card-disabled">
+      <div class="card-icon">🌬️</div>
+      <h3>DeePower</h3>
+      <p>Analytics platform for wind farm SCADA data. Performance
+         monitoring, anomaly detection and production forecasting for
+         utility-scale wind assets.</p>
+      <span class="badge badge-soon">COMING SOON</span>
+    </div>
+
+  </div>
+
+  <footer>
+    Built by <span>fborbon</span> &mdash; Forward Forecasting &copy; 2026
+  </footer>
+
+</body>
+</html>
