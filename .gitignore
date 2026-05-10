@@ -22,3 +22,10 @@ outputs/**/*.csv
 # Claude Code local memory
 .claude/
 cache/
+
+# Portfolio landing page (served on EC2, not part of the SP500 bot code)
+landing/
+
+# Personal documents
+Fundamental analysis.odt
+Deploy AWS.txt
