@@ -77,7 +77,6 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      text-decoration: none;
       color: var(--text);
       transition: border-color .25s, transform .2s, box-shadow .25s;
       position: relative;
@@ -91,10 +90,12 @@
       background: linear-gradient(135deg, rgba(225,195,64,.06) 0%, transparent 60%);
       opacity: 0;
       transition: opacity .25s;
+      pointer-events: none;
     }
-    .card:hover { border-color: var(--gold); transform: translateY(-4px);
-                  box-shadow: 0 12px 40px rgba(225,195,64,.15); }
-    .card:hover::before { opacity: 1; }
+    .card-link { cursor: pointer; }
+    .card-link:hover { border-color: var(--gold); transform: translateY(-4px);
+                       box-shadow: 0 12px 40px rgba(225,195,64,.15); }
+    .card-link:hover::before { opacity: 1; }
 
     .card-icon {
       width: 52px; height: 52px;
@@ -104,7 +105,14 @@
       background: rgba(225,195,64,.12);
     }
     .card h3  { font-size: 1.25rem; font-weight: 700; }
-    .card p   { font-size: .95rem; color: var(--muted); line-height: 1.6; }
+    .card p   { font-size: .95rem; color: var(--muted); line-height: 1.6; flex: 1; }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: auto;
+    }
 
     .badge {
       display: inline-block;
@@ -113,11 +121,25 @@
       letter-spacing: .06em;
       padding: 3px 10px;
       border-radius: 20px;
-      margin-top: auto;
       width: fit-content;
     }
     .badge-live   { background: rgba(52,211,153,.15); color: #34d399; border: 1px solid rgba(52,211,153,.3); }
     .badge-soon   { background: rgba(225,195,64,.12); color: var(--gold); border: 1px solid rgba(225,195,64,.3); }
+
+    .github-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      text-decoration: none;
+      transition: border-color .15s, color .15s;
+    }
+    .github-btn:hover { border-color: var(--gold); color: var(--gold); }
 
     .card-disabled { cursor: default; pointer-events: none; opacity: .75; }
     .card-disabled:hover { border-color: var(--border); transform: none; box-shadow: none; }
@@ -150,23 +172,69 @@
 
   <div class="cards">
 
-    <a class="card" href="/SP500bot">
+    <div class="card card-link" onclick="location.href='/SP500bot'">
       <div class="card-icon">📈</div>
       <h3>SP500 Correlation Bot</h3>
       <p>Correlation-based trading signals for the full S&P 500 universe.
          Predicts 7-day price targets using Random Forest regression on
          daily returns, with interactive charts and fundamental analysis.</p>
-      <span class="badge badge-live">● LIVE</span>
-    </a>
+      <div class="card-footer">
+        <span class="badge badge-live">● LIVE</span>
+        <a class="github-btn" href="https://github.com/fborbon/SP500_Invest" target="_blank" rel="noopener" onclick="event.stopPropagation()">⌥ GitHub</a>
+      </div>
+    </div>
 
-    <a class="card" href="/taxes">
+    <div class="card card-link" onclick="location.href='/taxes'">
       <div class="card-icon">🧾</div>
       <h3>Where are my taxes?</h3>
       <p>Interactive breakdown of Spain's consolidated public spending by
          category — pensions, health, education, defense and more. Explore
          regional disparities, EU comparisons, and year-on-year trends.</p>
-      <span class="badge badge-live">● LIVE</span>
-    </a>
+      <div class="card-footer">
+        <span class="badge badge-live">● LIVE</span>
+        <a class="github-btn" href="https://github.com/fborbon/where-do-my-taxes-go" target="_blank" rel="noopener" onclick="event.stopPropagation()">⌥ GitHub</a>
+      </div>
+    </div>
+
+    <div class="card card-link" onclick="location.href='/facial-recognition'">
+      <div class="card-icon">🎭</div>
+      <h3>Facial Recognition</h3>
+      <p>Frame-by-frame emotion analysis of a YouTube video using DeepFace
+         and Claude Vision. Detects dominant emotions across 8+ facial
+         detections, with AI-generated summaries and visual report cards.</p>
+      <div class="card-footer">
+        <span class="badge badge-live">● LIVE</span>
+        <a class="github-btn" href="https://github.com/fborbon/photo-visor" target="_blank" rel="noopener" onclick="event.stopPropagation()">⌥ GitHub</a>
+      </div>
+    </div>
+
+    <div class="card card-link" onclick="location.href='/music-spectra'">
+      <div class="card-icon">🎵</div>
+      <h3>Music Spectra</h3>
+      <p>Visualises the energy arc of songs over time — how a track builds,
+         peaks at the chorus, and winds down. Extracts acoustic features
+         (RMS energy, spectral centroid, onset strength) with librosa and
+         produces per-song stress curves, Mel spectrograms, and a batch
+         overlay for full-playlist comparison.</p>
+      <div class="card-footer">
+        <span class="badge badge-live">● LIVE</span>
+        <a class="github-btn" href="https://github.com/fborbon/music-analytics-test1" target="_blank" rel="noopener" onclick="event.stopPropagation()">⌥ GitHub</a>
+      </div>
+    </div>
+
+    <div class="card card-link" onclick="location.href='/social-pulse'">
+      <div class="card-icon">📡</div>
+      <h3>Social Pulse</h3>
+      <p>Real-time social intelligence platform monitoring 13 sources
+         (HackerNews, Lobste.rs, Dev.to, arXiv, GDELT, Federal Register
+         and more) across 20 editorial topics. Semantic filtering,
+         time-decay ranking, AI daily briefings, RAG search, entity
+         co-occurrence graph, spike detection, and historical trends.</p>
+      <div class="card-footer">
+        <span class="badge badge-live">● LIVE</span>
+        <a class="github-btn" href="https://github.com/fborbon/social-pulse" target="_blank" rel="noopener" onclick="event.stopPropagation()">⌥ GitHub</a>
+      </div>
+    </div>
 
     <div class="card card-disabled">
       <div class="card-icon">🌬️</div>
@@ -174,7 +242,9 @@
       <p>Analytics platform for wind farm SCADA data. Performance
          monitoring, anomaly detection and production forecasting for
          utility-scale wind assets.</p>
-      <span class="badge badge-soon">COMING SOON</span>
+      <div class="card-footer">
+        <span class="badge badge-soon">COMING SOON</span>
+      </div>
     </div>
 
   </div>
