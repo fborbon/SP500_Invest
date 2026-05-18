@@ -426,3 +426,33 @@ Stocks with absolute Pearson r ≥ 0.50 relative to the target are included as p
 **`General/volume_series_absolute.png`** / **`volume_series_normalized.png`** — Daily trading volume time series, highlighted by average volume and normalized volume growth respectively.
 
 **`General/cumulative_returns.png`** — Cumulative return (%) and dollar return ($ per share) since the start of the history window, with top 15 best performers highlighted.
+
+---
+
+## Auditing
+
+This section provides a structured checklist for review by an IT expert and a quantitative-finance / algorithmic-trading subject-matter expert.
+
+### Audit Items
+
+- **Cost & resource minimization** — $0. Yahoo Finance data is free; IB connection is local. No cloud services or paid APIs are used. Parquet caching and market-cap TTL minimize redundant network calls.
+- **IT architecture** — Seven-stage pipeline with clean module separation (analysis / broker / reporting). Parquet incremental caching avoids full re-downloads. Paper trading mode (`port 7497`) provides a safe testing environment before live deployment. The Streamlit dashboard reads output CSV files, decoupling analysis from visualization.
+- **Code efficiency** — Parquet incremental update with a 15-day overlap window correctly handles dividend/split adjustments. Parallel fundamentals fetching (10 threads, 2 retries) minimizes I/O wait. Market-cap cache (24h TTL) avoids redundant yfinance calls. `n_jobs=-1` parallelizes Random Forest tree construction across all CPU cores.
+- **Cybersecurity** — Interactive Brokers credentials are managed by TWS/Gateway locally; no API keys are stored in the project. Live trading requires an explicit manual confirmation step. All data sources (Yahoo Finance, Wikipedia, IB) are accessed over standard HTTPS/local socket connections.
+- **Readability & maintainability** — All constants are centralized in `config.py`. The walk-forward cross-validation rationale and each model hyperparameter are documented. The signal generation logic is compact and auditable.
+- **AI / ML model adequacy** — Random Forest with `TimeSeriesSplit` is sound for this task. `MIN_R2=0.01` is a very permissive confidence threshold that may generate signals from models with near-zero predictive power. Pearson correlation assumes linear relationships; non-linear cross-stock dependencies are not captured at the predictor selection stage.
+- **Financial risk** — Live trading operates with real money. No stop-loss, trailing-stop, or maximum drawdown mechanism is documented. `MAX_POSITION_PCT=0.10` limits per-position concentration but multiple correlated BUY signals could create sector concentration. Correlation-based strategies historically break down during market dislocations (e.g., credit crises, flash crashes).
+- **Other** — Wikipedia HTML scraping for S&P 500 constituents is fragile; a format change could break the entire universe-selection stage. yfinance data quality and availability are not guaranteed and should not be the sole data source for live trading decisions. No backtesting framework is present to validate signals against historical periods.
+
+### Summary Table
+
+| Audit Item | Claude's Assessment | Human Expert Assessment |
+|---|---|---|
+| Cost & resource minimization | $0. Parquet + TTL caching minimize redundant yfinance calls. No cloud dependency. | |
+| IT architecture | Seven-stage pipeline with clean module separation. Paper trading mode is a correct safeguard. | |
+| Code efficiency | Incremental Parquet update, parallel fundamentals fetch, and CPU-parallel Random Forest are all appropriate. | |
+| Cybersecurity | IB credentials managed locally by TWS. No API keys in code. Live trading has manual confirmation gate. | |
+| Readability & maintainability | Configuration centralized in config.py. Hyperparameter and model rationale well-documented. | |
+| AI / ML model adequacy | Random Forest with TimeSeriesSplit is appropriate. MIN_R2=0.01 is very permissive — borderline signals may proliferate. Linear Pearson correlation may miss non-linear dependencies. | |
+| Financial risk | No stop-loss or drawdown limit. Correlated BUY signals could create sector concentration. Strategy vulnerable to market dislocation events. | |
+| Other | Wikipedia scraping for constituents is fragile. yfinance is not a guaranteed production data source. No backtesting framework for signal validation. | |
