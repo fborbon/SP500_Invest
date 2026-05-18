@@ -12,6 +12,11 @@ import streamlit as st
 
 from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
+def _html_iframe(html: str, height: int, scrolling: bool = False) -> None:
+    """Render an HTML string in an iframe via a base64 data URI (replaces components.v1.html)."""
+    b64 = base64.b64encode(html.encode()).decode()
+    st.iframe(src=f"data:text/html;base64,{b64}", height=height, scrolling=scrolling)
+
 @st.cache_data
 def _load_csv(path, **kwargs):
     return pd.read_csv(path, **kwargs)
@@ -176,7 +181,7 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
       </script>
     </body></html>
     """
-    st.iframe(src_doc=full_html, height=height + 30, scrolling=False)
+    _html_iframe(full_html, height=height + 30, scrolling=False)
 
 
 def _chart_title(title: str, tooltip: str):
@@ -227,7 +232,7 @@ el.addEventListener('mouseleave', function() {{
 }});
 </script>
 </body></html>"""
-    st.iframe(src_doc=html, height=38, scrolling=False)
+    _html_iframe(html, height=38, scrolling=False)
 
 
 _ECHARTS_CDN = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
@@ -472,7 +477,7 @@ periods.forEach(function(p){{
 </script>
 </body></html>"""
 
-    st.iframe(src_doc=html, height=height + 55, scrolling=False)
+    _html_iframe(html, height=height + 55, scrolling=False)
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
