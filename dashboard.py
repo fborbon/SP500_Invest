@@ -912,3 +912,18 @@ with tab_corr:
                 )
             else:
                 st.info('Select at least one company above to display the chart.')
+
+# ── Footer — last execution datetime ──────────────────────────────────────────
+try:
+    from datetime import datetime as _dt
+    _run_ts = _dt.strptime(run_dir.name, '%Y-%m-%d_%H-%M').strftime('%Y-%m-%d %H:%M UTC')
+except Exception:
+    _run_ts = run_dir.name
+
+st.divider()
+st.markdown(
+    f"<div style='text-align:center;color:#666;font-size:0.8rem;padding:0.4rem 0 1rem;'>"
+    f"🕐 Last bot run: <strong style='color:#aaa;'>{_run_ts}</strong>"
+    f"</div>",
+    unsafe_allow_html=True,
+)
