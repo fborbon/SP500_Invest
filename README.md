@@ -14,9 +14,15 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term 7-day p
 2. [Libraries](#libraries)
 3. [Usage](#usage)
 4. [Data Processing Pipeline](#data-processing-pipeline)
-5. [Machine Learning Model](#machine-learning-model)
-6. [Output Files](#output-files)
-7. [Auditing](#auditing)
+5. [Data Flow Diagram](#data-flow-diagram)
+6. [Predictive Model](#predictive-model)
+7. [File Structure](#file-structure)
+8. [Key Configuration (`config.py`)](#key-configuration-configpy)
+9. [Selecting Companies](#selecting-companies)
+10. [Position Sizing](#position-sizing)
+11. [Inverse Correlation Logic](#inverse-correlation-logic)
+12. [Output Plots (`save_plots=True`)](#output-plots-saveplotstrue)
+13. [Auditing](#auditing)
 
 ---
 
