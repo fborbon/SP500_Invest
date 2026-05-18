@@ -1,6 +1,22 @@
 # SP500 Correlation Bot
 
-Algorithmic trading bot for Interactive Brokers that predicts short-term price movements using Pearson correlations across the full S&P 500 universe. Both direct and inverse correlations are used as predictors with a Random Forest model. The number of companies analyzed is configurable at runtime, always selecting the **N most valuable** by market cap.
+Algorithmic trading bot for Interactive Brokers that predicts short-term 7-day price movements using Pearson correlations across the full S&P 500 universe. Both direct and inverse correlations are used as features for a Random Forest model, with the universe size configurable at runtime to always select the **N most valuable** companies by market cap. Price data is fetched free from Yahoo Finance; Interactive Brokers is only connected when live order placement is enabled. A Streamlit dashboard visualises signals, fundamentals, correlation heatmaps, and cumulative returns after each run.
+
+**Main technologies:** Python · scikit-learn (Random Forest) · pandas · yfinance · ib-insync (Interactive Brokers API) · Streamlit · Plotly · pyarrow
+
+**Monthly cost:** $0. Yahoo Finance data is free; IB connection is local. No cloud services, no paid APIs, no subscriptions required. Running on a local machine or a shared EC2 instance adds no incremental cost.
+
+---
+
+## Table of Contents
+
+1. [Installation](#installation)
+2. [Libraries](#libraries)
+3. [Usage](#usage)
+4. [Data Processing Pipeline](#data-processing-pipeline)
+5. [Machine Learning Model](#machine-learning-model)
+6. [Output Files](#output-files)
+7. [Auditing](#auditing)
 
 ---
 
