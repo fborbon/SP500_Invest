@@ -9,7 +9,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
-import streamlit.components.v1 as components
 
 from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 
@@ -177,7 +176,7 @@ def _dual_scroll_table(df: pd.DataFrame, row_styles: dict = None, height: int = 
       </script>
     </body></html>
     """
-    components.html(full_html, height=height + 30, scrolling=False)
+    st.iframe(src_doc=full_html, height=height + 30, scrolling=False)
 
 
 def _chart_title(title: str, tooltip: str):
@@ -228,7 +227,7 @@ el.addEventListener('mouseleave', function() {{
 }});
 </script>
 </body></html>"""
-    components.html(html, height=38, scrolling=False)
+    st.iframe(src_doc=html, height=38, scrolling=False)
 
 
 _ECHARTS_CDN = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
@@ -473,7 +472,7 @@ periods.forEach(function(p){{
 </script>
 </body></html>"""
 
-    components.html(html, height=height + 55, scrolling=False)
+    st.iframe(src_doc=html, height=height + 55, scrolling=False)
 
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -674,7 +673,7 @@ with tab_mcap:
                 'Bar chart comparing the last closing price (top) and current market capitalisation in $B (bottom) '
                 f'for the top {TOP_N_HIGHLIGHT} and bottom {TOP_N_HIGHLIGHT} S&P 500 companies by market cap. '
                 'Hover any bar to see company name, sector, price and cap. Green = top companies, red = bottom.')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             # ── Market cap time series ────────────────────────────────────────
             prices_path = run_dir / 'prices.csv'
@@ -862,7 +861,7 @@ with tab_corr:
                 'Red = strong inverse correlation (stocks move in opposite directions). '
                 'Green = strong direct correlation (stocks move together). '
                 'Values close to 0 indicate little or no linear relationship.')
-            st.image(str(matrix_path), use_container_width=True)
+            st.image(str(matrix_path), width='stretch')
             st.divider()
         else:
             st.info('No plots found in Correlation_method/ for this run.')
