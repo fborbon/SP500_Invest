@@ -15,6 +15,7 @@ from reporting.charts import (plot_correlation_matrix, plot_cumulative_returns,
                                plot_market_cap_bars, plot_market_cap_series,
                                plot_prediction_analysis, plot_price_series,
                                plot_volume_series)
+from reporting.precompute import precompute_dashboard_cache
 from reporting.report import print_report, save_signals_csv
 
 
@@ -144,6 +145,9 @@ def run_bot(execute_trades: bool = False, save_plots: bool = True,
                     y_actual, y_pred,
                     save_path=corr_dir / f'analysis_{ticker}.png'
                 )
+
+    print("\nPre-computing dashboard cache")
+    precompute_dashboard_cache(run_dir)
 
     print("\nExecute trades in IBKR")
     if execute_trades:
