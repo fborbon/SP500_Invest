@@ -23,6 +23,7 @@ Algorithmic trading bot for Interactive Brokers that predicts short-term 7-day p
 11. [Inverse Correlation Logic](#inverse-correlation-logic)
 12. [Output Plots (`save_plots=True`)](#output-plots-saveplotstrue)
 13. [Auditing](#auditing)
+14. [CI/CD](#cicd)
 
 ---
 
@@ -479,3 +480,68 @@ This section provides a structured checklist for review by an IT expert and a qu
 | Financial risk | No stop-loss or drawdown limit. Correlated BUY signals could create sector concentration. Strategy vulnerable to market dislocation events. | |
 | Other | Wikipedia scraping for constituents is fragile. yfinance is not a guaranteed production data source. No backtesting framework for signal validation. | |
 
+
+---
+
+## CI/CD
+
+### What is CI/CD?
+
+**CI/CD** stands for **Continuous Integration / Continuous Deployment**. It is a software engineering practice that automates the steps of verifying, packaging, and releasing code whenever a change is pushed to the repository.
+
+- **Continuous Integration (CI)** — each push triggers automated checks that confirm the change doesn't break the codebase.
+- **Continuous Deployment (CD)** — once checks pass, the new version is automatically shipped to the live environment with no manual steps.
+
+### Key Benefits
+
+| Benefit | Description |
+|---|---|
+| **Speed** | Changes go live in seconds, not hours |
+| **Consistency** | Every deploy follows the exact same steps — no human error |
+| **Safety** | Broken code is caught before it reaches production |
+| **Traceability** | Every deployment is linked to a specific commit and author |
+| **Zero-downtime iterations** | Small frequent releases are safer than large rare ones |
+
+### How it is applied here
+
+The SP500 Bot runs as a **Docker Compose** service on a shared EC2 instance (`t3.small`, `eu-west-1`). The Streamlit dashboard is containerised — the Python code is copied into the image at build time (`COPY . .` in the Dockerfile). On every push to `main`, GitHub Actions SSH-es into the EC2, resets the code, and rebuilds the Docker image with `docker compose up -d --build`. The `cache/` and `outputs/` volumes are mounted and preserved across rebuilds so historical data and run artefacts are never lost. If the directory isn't yet a git repository (first deploy), the workflow initialises it and adds the remote automatically.
+
+**Trigger:** push to `main`
+**Runner:** `ubuntu-latest` (GitHub-hosted)
+**Secrets required:** `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`
+
+### Implementation Diagram
+
+```mermaid
+flowchart TD
+    DEV([👨‍💻 Developer\npushes to main])
+    GH[GitHub repository\nfborbon/sp500-correlation-bot]
+    GA[GitHub Actions\nubuntu-latest runner]
+    SSH[appleboy/ssh-action\nSSH connection]
+    EC2[EC2 t3.small\n54.78.82.101]
+    INIT{.git present\nat /opt/forwardforecasting?}
+    CLONE[git init + add remote]
+    FETCH[git fetch origin main]
+    RESET[git reset --hard origin/main]
+    BUILD[docker compose up -d --build\nrebuilds image with new code]
+    VOL[(cache/ + outputs/\nvolumes preserved)]
+    DONE[✅ Dashboard live at\n/SP500bot]
+
+    DEV --> GH
+    GH --> GA
+    GA --> SSH
+    SSH -->|authenticated via\nEC2_SSH_KEY secret| EC2
+    EC2 --> INIT
+    INIT -->|No| CLONE --> FETCH
+    INIT -->|Yes| FETCH
+    FETCH --> RESET
+    RESET --> BUILD
+    BUILD --> VOL
+    BUILD --> DONE
+
+    style DEV fill:#4a90d9,color:#fff
+    style DONE fill:#27ae60,color:#fff
+    style EC2 fill:#e67e22,color:#fff
+    style BUILD fill:#2c3e50,color:#fff
+    style VOL fill:#7f8c8d,color:#fff
+```
