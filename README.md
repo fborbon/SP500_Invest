@@ -478,3 +478,4 @@ This section provides a structured checklist for review by an IT expert and a qu
 | AI / ML model adequacy | Random Forest with TimeSeriesSplit is appropriate. MIN_R2=0.01 is very permissive — borderline signals may proliferate. Linear Pearson correlation may miss non-linear dependencies. | |
 | Financial risk | No stop-loss or drawdown limit. Correlated BUY signals could create sector concentration. Strategy vulnerable to market dislocation events. | |
 | Other | Wikipedia scraping for constituents is fragile. yfinance is not a guaranteed production data source. No backtesting framework for signal validation. | |
+
