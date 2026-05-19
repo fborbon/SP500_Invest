@@ -164,10 +164,22 @@ def _mobile_table(df: pd.DataFrame, style_fn, height: int = 400,
 
 
 def _mobile_chart(gen_dir, filename: str, caption: str = '') -> None:
-    """Display a pre-built PNG chart. Falls back silently if not found."""
+    """Embed a pre-built PNG as an inline base64 <img> tag.
+
+    Uses st.markdown instead of st.image so the image travels in the
+    WebSocket message and never needs a separate HTTP round-trip through
+    nginx. Safari allows data: URIs in <img> (only blocks them in iframes).
+    """
     p = gen_dir / filename
     if p.exists():
-        st.image(str(p), width='stretch', caption=caption)
+        b64 = base64.b64encode(p.read_bytes()).decode()
+        cap = (f'<p style="font-size:0.72rem;color:#888;text-align:center;'
+               f'margin:3px 0 0;">{caption}</p>') if caption else ''
+        st.markdown(
+            f'<img src="data:image/png;base64,{b64}" '
+            f'style="width:100%;display:block;border-radius:6px;"/>{cap}',
+            unsafe_allow_html=True,
+        )
     else:
         st.info('Chart not yet generated — run the bot with save_plots=True.')
 
@@ -617,7 +629,15 @@ with tab_corr:
             _chart_title('Correlation Matrix',
                 f'Pearson correlation matrix for the top {TOP_N_HIGHLIGHT} S&P 500 companies. '
                 'Red = strong inverse. Green = strong direct. Values near 0 = no linear relationship.')
-            st.image(str(matrix_path), width='stretch')
+            if is_mobile:
+                b64m = base64.b64encode(matrix_path.read_bytes()).decode()
+                st.markdown(
+                    f'<img src="data:image/png;base64,{b64m}" '
+                    f'style="width:100%;display:block;border-radius:6px;"/>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.image(str(matrix_path), width='stretch')
             st.divider()
         else:
             st.info('No plots found in Correlation_method/ for this run.')
