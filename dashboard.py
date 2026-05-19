@@ -15,7 +15,7 @@ from config import OUTPUTS_DIR, TOP_N_HIGHLIGHT
 def _html_iframe(html: str, height: int, scrolling: bool = False) -> None:
     """Render an HTML string in an iframe via a base64 data URI (replaces components.v1.html)."""
     b64 = base64.b64encode(html.encode()).decode()
-    st.iframe(src=f"data:text/html;base64,{b64}", height=height, scrolling=scrolling)
+    st.iframe(src=f"data:text/html;base64,{b64}", height=height)
 
 @st.cache_data
 def _load_csv(path, **kwargs):
