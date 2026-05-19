@@ -228,9 +228,9 @@ with tab_signals:
         st.divider()
 
         if is_mobile:
-            # ── Mobile: st.dataframe, no iframes ─────────────────────────────
-            _MOB_COLS = ['ticker', 'company_name', 'signal', 'predicted_return', 'current_price']
-            df_mob = df[[c for c in _MOB_COLS if c in df.columns]].copy()
+            # ── Mobile: st.dataframe, no iframes — all columns ────────────────
+            st.subheader('📋 Signals')
+            df_mob = df.copy()
 
             _SIG_BG = {'BUY': '#d4edda', 'SELL': '#f8d7da', 'HOLD': '#fff3cd'}
             _SIG_FG = {'BUY': '#155724', 'SELL': '#721c24', 'HOLD': '#856404'}
@@ -245,11 +245,15 @@ with tab_signals:
                             styles.loc[idx, :] = f'background-color:{bg};color:{fg}'
                 return styles
 
-            _mobile_table(df_mob, _sig_style, height=420, fmt={
+            _fmt = {c: v for c, v in {
                 'predicted_return': '{:+.1f}%',
                 'current_price':    '${:.2f}',
-            })
-            st.caption('🟢 BUY  🔴 SELL  🟡 HOLD — tap ticker to open Yahoo Finance')
+                'target_price_7d':  '${:.2f}',
+                'model_r2':         '{:.2f}',
+                'market_cap_B':     '${:.1f}B',
+            }.items() if c in df_mob.columns}
+            _mobile_table(df_mob, _sig_style, height=460, fmt=_fmt)
+            st.caption('🟢 BUY  🔴 SELL  🟡 HOLD — scroll right for more columns')
         else:
             # ── Desktop: base64 iframe with full feature set ──────────────────
             if not _render_cached(run_dir, 'signals_table', 530):
@@ -305,10 +309,9 @@ with tab_fund:
         st.divider()
 
         if is_mobile:
-            # ── Mobile: st.dataframe ──────────────────────────────────────────
-            _MOB_FCOLS = ['ticker', 'company_name', 'sector', 'likelihood_pct',
-                          'market_cap_B', 'pe_ratio']
-            df_mob = df.reset_index()[[c for c in _MOB_FCOLS if c in df.reset_index().columns]]
+            # ── Mobile: st.dataframe — all columns ────────────────────────────
+            st.subheader('🏦 Fundamentals')
+            df_fund = df.reset_index()
 
             def _fund_style(frame):
                 styles = pd.DataFrame('', index=frame.index, columns=frame.columns)
@@ -324,12 +327,25 @@ with tab_fund:
                             pass
                 return styles
 
-            _mobile_table(df_mob, _fund_style, height=420, fmt={
-                'likelihood_pct': '{:.1f}%',
-                'market_cap_B':   '${:.1f}B',
-                'pe_ratio':       '{:.1f}',
-            })
-            st.caption('🟢 ≥70%  🟡 ≥50%  🔴 <50%  12-month price increase likelihood')
+            _ffmt = {c: v for c, v in {
+                'likelihood_pct':   '{:.1f}%',
+                'market_cap_B':     '${:.1f}B',
+                'pe_ratio':         '{:.1f}',
+                'peg_ratio':        '{:.2f}',
+                'ps_ratio':         '{:.1f}',
+                'pb_ratio':         '{:.1f}',
+                'ev_ebitda':        '{:.1f}',
+                'eps':              '${:.2f}',
+                'revenue_growth':   '{:.1f}%',
+                'gross_margin':     '{:.1f}%',
+                'operating_margin': '{:.1f}%',
+                'net_margin':       '{:.1f}%',
+                'earnings_growth':  '{:.1f}%',
+                'debt_to_equity':   '{:.2f}',
+                'current_ratio':    '{:.2f}',
+            }.items() if c in df_fund.columns}
+            _mobile_table(df_fund, _fund_style, height=460, fmt=_ffmt)
+            st.caption('🟢 ≥70%  🟡 ≥50%  🔴 <50%  12-month price increase likelihood — scroll right for more columns')
         else:
             # ── Desktop ───────────────────────────────────────────────────────
             if not _render_cached(run_dir, 'fund_table', 570):
@@ -360,9 +376,16 @@ with tab_mcap:
             sdf = sdf.dropna(subset=['market_cap_B']).sort_values('market_cap_B', ascending=False)
 
             if is_mobile:
-                # ── Mobile: pre-built PNG ─────────────────────────────────────
+                # ── Mobile: pre-built PNGs ────────────────────────────────────
+                st.subheader('📊 Market Cap')
                 _mobile_chart(gen_dir, 'market_cap_bars.png',
-                              f'Top vs Bottom {TOP_N_HIGHLIGHT} companies by market cap')
+                              f'Top vs bottom {TOP_N_HIGHLIGHT} companies — close price & market cap')
+                st.divider()
+                _mobile_chart(gen_dir, 'market_cap_series_absolute.png',
+                              f'Market cap time series — top {TOP_N_HIGHLIGHT} by current market cap')
+                st.divider()
+                _mobile_chart(gen_dir, 'market_cap_series_normalized.png',
+                              f'Market cap time series — top {TOP_N_HIGHLIGHT} by cap growth')
             else:
                 # ── Desktop: interactive Plotly + ECharts ─────────────────────
                 top    = sdf.head(TOP_N_HIGHLIGHT)
@@ -444,12 +467,16 @@ with tab_prices:
     prices_path  = run_dir / 'prices.csv'
 
     if is_mobile:
-        # ── Mobile: pre-built PNGs ────────────────────────────────────────────
+        # ── Mobile: pre-built PNGs — all 3 price charts ───────────────────────
+        st.subheader('📈 Price Series')
         _mobile_chart(gen_dir, 'price_series_market-cap.png',
-                      f'Price series — top {TOP_N_HIGHLIGHT} by market cap')
+                      f'Top {TOP_N_HIGHLIGHT} by market cap')
+        st.divider()
+        _mobile_chart(gen_dir, 'price_series_stock-price-absolute.png',
+                      f'Top {TOP_N_HIGHLIGHT} by stock price')
         st.divider()
         _mobile_chart(gen_dir, 'price_series_normalized-return.png',
-                      f'Price series — top {TOP_N_HIGHLIGHT} by normalized return')
+                      f'Top {TOP_N_HIGHLIGHT} by normalized return')
     else:
         # ── Desktop: interactive ECharts ──────────────────────────────────────
         if prices_path.exists() and signals_path.exists():
@@ -502,11 +529,12 @@ with tab_volume:
         st.info('volume.csv not found — re-run the bot to enable this tab.')
     elif is_mobile:
         # ── Mobile: pre-built PNGs ────────────────────────────────────────────
+        st.subheader('📦 Volume')
         _mobile_chart(gen_dir, 'volume_series_absolute.png',
-                      f'Volume — top {TOP_N_HIGHLIGHT} by average daily volume')
+                      f'Top {TOP_N_HIGHLIGHT} by average daily volume')
         st.divider()
         _mobile_chart(gen_dir, 'volume_series_normalized.png',
-                      f'Volume — top {TOP_N_HIGHLIGHT} by volume growth')
+                      f'Top {TOP_N_HIGHLIGHT} by volume growth')
     else:
         # ── Desktop: interactive ECharts ──────────────────────────────────────
         vol_df  = _load_csv(str(volume_path), index_col=0, parse_dates=True)
@@ -544,8 +572,9 @@ with tab_returns:
         st.info('prices.csv not found — re-run the bot to enable this tab.')
     elif is_mobile:
         # ── Mobile: pre-built PNG ─────────────────────────────────────────────
+        st.subheader('💹 Cumulative Returns')
         _mobile_chart(gen_dir, 'cumulative_returns.png',
-                      f'Cumulative returns — top {TOP_N_HIGHLIGHT} best performers since {_CHART_START_DATE}')
+                      f'Top {TOP_N_HIGHLIGHT} best performers since {_CHART_START_DATE}')
     else:
         # ── Desktop: interactive EChart ───────────────────────────────────────
         ret_prices = _load_csv(str(prices_path_r), index_col=0, parse_dates=True)
@@ -581,6 +610,7 @@ with tab_corr:
             st.info('No plots found in Correlation_method/ for this run.')
 
         if is_mobile:
+            st.subheader('🔗 Correlation')
             st.caption('Open on desktop for the interactive correlation explorer.')
         else:
             prices_path_c  = run_dir / 'prices.csv'
