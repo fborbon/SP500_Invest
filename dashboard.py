@@ -22,26 +22,19 @@ st.set_page_config(
     layout='wide',
 )
 
-# ── Mobile detection via JS → ?m=1 query param ───────────────────────────────
-# If the viewport is ≤ 768 px the script adds ?m=1 and reloads once, so Python
-# renders the lightweight mobile path for the rest of the session.
-_detect_js = base64.b64encode(b"""<script>
-(function(){
-  try {
-    var w = window.parent ? window.parent.innerWidth : window.innerWidth;
-    if (w && w <= 768) {
-      var u = new URL(window.parent.location.href);
-      if (u.searchParams.get('m') !== '1') {
-        u.searchParams.set('m', '1');
-        window.parent.location.replace(u.toString());
-      }
-    }
-  } catch(e) {}
-})();
-</script>""").decode()
-st.iframe(src=f"data:text/html;base64,{_detect_js}", height=1)
+# ── Mobile detection via User-Agent (no JS, no iframes, works on all browsers) ──
+# st.context.headers is available server-side — no client round-trip needed.
+_ua = st.context.headers.get("User-Agent", "")
+_ua_mobile = any(k in _ua for k in ("Mobile", "Android", "iPhone", "iPad", "iPod"))
 
-is_mobile = st.query_params.get("m") == "1"
+# Manual override: ?m=1 forces mobile, ?m=0 forces desktop
+_param = st.query_params.get("m", "")
+if _param == "1":
+    is_mobile = True
+elif _param == "0":
+    is_mobile = False
+else:
+    is_mobile = _ua_mobile
 
 # ── Responsive CSS ────────────────────────────────────────────────────────────
 st.markdown("""
@@ -161,9 +154,9 @@ def _mobile_chart(gen_dir, filename: str, caption: str = '') -> None:
     """Display a pre-built PNG chart. Falls back silently if not found."""
     p = gen_dir / filename
     if p.exists():
-        st.image(str(p), use_container_width=True, caption=caption)
+        st.image(str(p), width='stretch', caption=caption)
     else:
-        st.info(f'Chart not yet generated — run the bot with save_plots=True.')
+        st.info('Chart not yet generated — run the bot with save_plots=True.')
 
 
 # ── Run directory ─────────────────────────────────────────────────────────────
@@ -180,7 +173,19 @@ corr_dir = run_dir / 'Correlation_method'
 gen_dir  = run_dir / 'General'
 
 # ── Page header ───────────────────────────────────────────────────────────────
-st.title('📈 SP500 Correlation Bot')
+_tcol, _bcol = st.columns([6, 1])
+_tcol.title('📈 SP500 Correlation Bot')
+with _bcol:
+    st.write('')  # vertical alignment
+    if is_mobile:
+        if st.button('🖥️', help='Switch to desktop view'):
+            st.query_params['m'] = '0'
+            st.rerun()
+    else:
+        if st.button('📱', help='Switch to mobile view'):
+            st.query_params['m'] = '1'
+            st.rerun()
+
 if not is_mobile:
     st.markdown(
         """
@@ -570,7 +575,7 @@ with tab_corr:
             _chart_title('Correlation Matrix',
                 f'Pearson correlation matrix for the top {TOP_N_HIGHLIGHT} S&P 500 companies. '
                 'Red = strong inverse. Green = strong direct. Values near 0 = no linear relationship.')
-            st.image(str(matrix_path), use_container_width=True)
+            st.image(str(matrix_path), width='stretch')
             st.divider()
         else:
             st.info('No plots found in Correlation_method/ for this run.')
