@@ -143,10 +143,23 @@ def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
 
 def _mobile_table(df: pd.DataFrame, style_fn, height: int = 400,
                   fmt: dict = None) -> None:
-    """Render a DataFrame with row-level colour using Streamlit's native table."""
+    """Render a DataFrame with row-level colour using Streamlit's native table.
+
+    fmt maps column names to format strings (e.g. '{:.1f}%').
+    Values that cannot be converted to float are shown as '—'.
+    """
+    df = df.copy()
+    # Pre-convert any column we intend to format to numeric, silently coercing
+    # strings like 'N/A' or '' to NaN so the format string never sees a str.
+    if fmt:
+        for col in fmt:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
     styled = df.style.apply(style_fn, axis=None)
     if fmt:
-        styled = styled.format(fmt, na_rep='—')
+        safe = {col: (lambda v, f=fstr: f.format(v) if pd.notna(v) else '—')
+                for col, fstr in fmt.items() if col in df.columns}
+        styled = styled.format(safe, na_rep='—')
     st.dataframe(styled, height=height, use_container_width=True)
 
 
