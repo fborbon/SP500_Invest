@@ -23,8 +23,15 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
+            if [ ! -d /opt/forwardforecasting/.git ]; then
+              mkdir -p /opt/forwardforecasting
+              cd /opt/forwardforecasting
+              git init
+              git remote add origin https://github.com/fborbon/sp500-correlation-bot.git
+            fi
             cd /opt/forwardforecasting
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             docker compose up -d --build
             docker compose ps
             echo "✓ SP500 bot deployed at $(date -u)"
