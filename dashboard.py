@@ -56,16 +56,22 @@ st.markdown("""
     h1 { font-size: 1.25rem !important; line-height: 1.35 !important; }
     h2 { font-size: 1rem !important; }
     p  { font-size: 0.85rem !important; }
-    [data-testid="stTabs"] > div:first-child {
+    /* Tab bar: single scrollable row, no wrapping */
+    [data-baseweb="tab-list"] {
         overflow-x: auto !important;
+        overflow-y: hidden !important;
+        flex-wrap: nowrap !important;
         -webkit-overflow-scrolling: touch !important;
         scrollbar-width: none !important;
+        gap: 0 !important;
     }
-    [data-testid="stTabs"] > div:first-child::-webkit-scrollbar { display: none; }
-    button[data-baseweb="tab"] {
-        font-size: 0.6rem !important;
-        padding: 0.3rem 0.35rem !important;
+    [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+    /* Each tab button: fixed compact size, no text wrap */
+    [data-baseweb="tab"] {
+        flex-shrink: 0 !important;
         white-space: nowrap !important;
+        font-size: 1.1rem !important;
+        padding: 0.4rem 0.6rem !important;
         min-width: 0 !important;
     }
     [data-testid="column"] { min-width: 0 !important; }
@@ -189,15 +195,13 @@ if not is_mobile:
     )
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_returns, tab_corr = st.tabs([
-    '📋 Signals',
-    '🏦 Fundamentals',
-    '📊 Mkt Cap',
-    '📈 Prices',
-    '📦 Volume',
-    '💹 Returns',
-    '🔗 Correlation',
-])
+if is_mobile:
+    _tab_labels = ['📋', '🏦', '📊', '📈', '📦', '💹', '🔗']
+else:
+    _tab_labels = ['📋 Signals', '🏦 Fundamentals', '📊 Mkt Cap',
+                   '📈 Prices', '📦 Volume', '💹 Returns', '🔗 Correlation']
+
+tab_signals, tab_fund, tab_mcap, tab_prices, tab_volume, tab_returns, tab_corr = st.tabs(_tab_labels)
 
 
 # ── Tab 1: Signals ────────────────────────────────────────────────────────────
