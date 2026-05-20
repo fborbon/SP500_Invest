@@ -34,4 +34,6 @@ jobs:
             git reset --hard origin/main
             docker compose up -d --build
             docker compose ps
+            sudo cp nginx/forwardforecasting.conf /etc/nginx/sites-available/forwardforecasting.conf
+            sudo nginx -t && sudo nginx -s reload
             echo "✓ SP500 bot deployed at $(date -u)"
