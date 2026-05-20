@@ -40,11 +40,23 @@ else:
 st.markdown("""
 <style>
 @media (max-width: 768px) {
+    /* Prevent any element from causing horizontal scroll */
+    html, body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    section.main, .main {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
     .main .block-container {
         padding-left: 0.6rem !important;
         padding-right: 0.6rem !important;
         padding-top: 0.75rem !important;
-        max-width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
     }
     h1 { font-size: 1.25rem !important; line-height: 1.35 !important; }
     h2 { font-size: 1rem !important; }
