@@ -145,8 +145,7 @@ def _kpi_row(items: list) -> None:
     cells = ''.join(
         f'<div style="flex:1;text-align:center;padding:0.3rem 0.2rem;'
         f'{"border-right:1px solid #ddd;" if i < len(items) - 1 else ""}">'
-        f'<span style="font-size:0.65rem;color:#888;">{lbl} </span>'
-        f'<span style="font-size:0.95rem;font-weight:700;color:#1a1a1a;">{val}</span>'
+        f'<span style="font-size:0.82rem;color:#333;font-weight:600;">{lbl}&nbsp;{val}</span>'
         f'</div>'
         for i, (lbl, val) in enumerate(items)
     )
