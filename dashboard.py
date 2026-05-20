@@ -67,17 +67,21 @@ st.markdown("""
         padding: 0.4rem 0.6rem !important;
         min-width: 0 !important;
     }
-    /* Force metric columns to stay in a single horizontal row */
+    /* Force metric columns to stay in a single horizontal row, no gaps */
     [data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
+        gap: 0 !important;
     }
     [data-testid="column"] {
         min-width: 0 !important;
         flex: 1 1 0 !important;
         width: auto !important;
+        padding: 0 !important;
+        border-right: 1px solid #ddd !important;
     }
-    [data-testid="stMetric"] { padding: 0.35rem 0.3rem !important; }
+    [data-testid="column"]:last-child { border-right: none !important; }
+    [data-testid="stMetric"] { padding: 0.3rem 0.4rem !important; text-align: center !important; }
     [data-testid="stMetric"] label { font-size: 0.62rem !important; white-space: nowrap !important; }
     [data-testid="stMetricValue"] { font-size: 1rem !important; }
     hr { margin: 0.4rem 0 !important; }
