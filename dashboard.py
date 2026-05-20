@@ -81,7 +81,7 @@ st.markdown("""
 
 def _html_iframe(html: str, height: int, scrolling: bool = False) -> None:
     b64 = base64.b64encode(html.encode()).decode()
-    st.iframe(src=f"data:text/html;base64,{b64}", height=height)
+    st.iframe(src=f"data:text/html;charset=utf-8;base64,{b64}", height=height)
 
 
 def _render_cached(run_dir, name: str, height: int) -> bool:
