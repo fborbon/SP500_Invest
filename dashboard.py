@@ -144,13 +144,13 @@ def _kpi_row(items: list) -> None:
     """Compact mobile KPI strip: label + value on one line, divided by vertical lines."""
     cells = ''.join(
         f'<div style="flex:1;text-align:center;padding:0.3rem 0.2rem;'
-        f'{"border-right:1px solid #ddd;" if i < len(items) - 1 else ""}">'
-        f'<span style="font-size:0.82rem;color:#333;font-weight:600;">{lbl}&nbsp;{val}</span>'
+        f'{"border-right:1px solid #666;" if i < len(items) - 1 else ""}">'
+        f'<span style="font-size:0.82rem;color:#fff;font-weight:600;">{lbl}:&nbsp;&nbsp;{val}</span>'
         f'</div>'
         for i, (lbl, val) in enumerate(items)
     )
     st.markdown(
-        f'<div style="display:flex;flex-wrap:nowrap;border:1px solid #e0e0e0;'
+        f'<div style="display:flex;flex-wrap:nowrap;background:#444;'
         f'border-radius:6px;overflow:hidden;margin-bottom:0.4rem;">{cells}</div>',
         unsafe_allow_html=True,
     )
