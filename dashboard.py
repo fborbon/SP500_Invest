@@ -67,10 +67,19 @@ st.markdown("""
         padding: 0.4rem 0.6rem !important;
         min-width: 0 !important;
     }
-    [data-testid="column"] { min-width: 0 !important; }
-    [data-testid="stMetric"] { padding: 0.35rem 0.4rem !important; }
-    [data-testid="stMetric"] label { font-size: 0.65rem !important; }
-    [data-testid="stMetricValue"] { font-size: 1.05rem !important; }
+    /* Force metric columns to stay in a single horizontal row */
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+    [data-testid="column"] {
+        min-width: 0 !important;
+        flex: 1 1 0 !important;
+        width: auto !important;
+    }
+    [data-testid="stMetric"] { padding: 0.35rem 0.3rem !important; }
+    [data-testid="stMetric"] label { font-size: 0.62rem !important; white-space: nowrap !important; }
+    [data-testid="stMetricValue"] { font-size: 1rem !important; }
     hr { margin: 0.4rem 0 !important; }
 }
 </style>
@@ -246,7 +255,7 @@ with tab_signals:
         sells = (df['signal'] == 'SELL').sum()
         holds = (df['signal'] == 'HOLD').sum()
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric('#' if is_mobile else 'Total tickers', len(df))
+        c1.metric('Tickers', len(df))
         c2.metric('BUY',  buys)
         c3.metric('SELL', sells)
         c4.metric('HOLD', holds)
@@ -327,10 +336,10 @@ with tab_fund:
         df = _load_csv(str(path), index_col=0)
 
         c1, c2, c3 = st.columns(3)
-        c1.metric('Cos' if is_mobile else 'Companies', len(df))
+        c1.metric('Companies', len(df))
         if 'likelihood_pct' in df.columns:
-            c2.metric('Avg' if is_mobile else 'Avg score', f"{df['likelihood_pct'].mean():.1f}%")
-            c3.metric('Top' if is_mobile else 'Top score', f"{df['likelihood_pct'].max():.1f}%")
+            c2.metric('Avg score', f"{df['likelihood_pct'].mean():.1f}%")
+            c3.metric('Top score', f"{df['likelihood_pct'].max():.1f}%")
         st.divider()
 
         if is_mobile:
