@@ -40,24 +40,36 @@ else:
 st.markdown("""
 <style>
 @media (max-width: 768px) {
-    /* Prevent any element from causing horizontal scroll */
+    /* Kill horizontal scroll at every level */
+    *, *::before, *::after { box-sizing: border-box !important; }
     html, body {
         overflow-x: hidden !important;
+        width: 100% !important;
         max-width: 100vw !important;
     }
+    [data-testid="stApp"],
     [data-testid="stAppViewContainer"],
     [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"],
     section.main, .main {
         overflow-x: hidden !important;
+        width: 100% !important;
         max-width: 100vw !important;
+        min-width: unset !important;
     }
     .main .block-container {
         padding-left: 0.6rem !important;
         padding-right: 0.6rem !important;
         padding-top: 0.75rem !important;
+        width: 100% !important;
         max-width: 100vw !important;
+        min-width: unset !important;
         overflow-x: hidden !important;
     }
+    /* Clamp dataframes and any wide child */
+    [data-testid="stDataFrame"],
+    [data-testid="stDataFrame"] > div,
+    iframe { max-width: 100% !important; }
     h1 { font-size: 1.25rem !important; line-height: 1.35 !important; }
     h2 { font-size: 1rem !important; }
     p  { font-size: 0.85rem !important; }
