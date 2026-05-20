@@ -626,9 +626,12 @@ with tab_corr:
     else:
         matrix_path = corr_dir / 'correlation_matrix.png'
         if matrix_path.exists():
-            _chart_title('Correlation Matrix',
-                f'Pearson correlation matrix for the top {TOP_N_HIGHLIGHT} S&P 500 companies. '
-                'Red = strong inverse. Green = strong direct. Values near 0 = no linear relationship.')
+            if is_mobile:
+                st.subheader('🔗 Correlation Matrix')
+            else:
+                _chart_title('Correlation Matrix',
+                    f'Pearson correlation matrix for the top {TOP_N_HIGHLIGHT} S&P 500 companies. '
+                    'Red = strong inverse. Green = strong direct. Values near 0 = no linear relationship.')
             if is_mobile:
                 b64m = base64.b64encode(matrix_path.read_bytes()).decode()
                 st.markdown(
@@ -643,7 +646,6 @@ with tab_corr:
             st.info('No plots found in Correlation_method/ for this run.')
 
         if is_mobile:
-            st.subheader('🔗 Correlation')
             st.caption('Open on desktop for the interactive correlation explorer.')
         else:
             prices_path_c  = run_dir / 'prices.csv'
