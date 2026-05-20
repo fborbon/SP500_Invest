@@ -140,6 +140,23 @@ el.addEventListener('mouseleave',function(){{clearTimeout(timer);tip.style.displ
     _html_iframe(html, height=38)
 
 
+def _kpi_row(items: list) -> None:
+    """Compact mobile KPI strip: label + value on one line, divided by vertical lines."""
+    cells = ''.join(
+        f'<div style="flex:1;text-align:center;padding:0.3rem 0.2rem;'
+        f'{"border-right:1px solid #ddd;" if i < len(items) - 1 else ""}">'
+        f'<span style="font-size:0.65rem;color:#888;">{lbl} </span>'
+        f'<span style="font-size:0.95rem;font-weight:700;color:#1a1a1a;">{val}</span>'
+        f'</div>'
+        for i, (lbl, val) in enumerate(items)
+    )
+    st.markdown(
+        f'<div style="display:flex;flex-wrap:nowrap;border:1px solid #e0e0e0;'
+        f'border-radius:6px;overflow:hidden;margin-bottom:0.4rem;">{cells}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _echarts_dual_chart(df_all, top_t, nm, norm_fn, abs_fn,
                         title, y1_label, y2_label, height=880,
                         start_date=_CHART_START_DATE, top_t_bottom=None,
@@ -258,11 +275,14 @@ with tab_signals:
         buys  = (df['signal'] == 'BUY').sum()
         sells = (df['signal'] == 'SELL').sum()
         holds = (df['signal'] == 'HOLD').sum()
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric('Tickers', len(df))
-        c2.metric('BUY',  buys)
-        c3.metric('SELL', sells)
-        c4.metric('HOLD', holds)
+        if is_mobile:
+            _kpi_row([('Tickers', len(df)), ('BUY', buys), ('SELL', sells), ('HOLD', holds)])
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric('Tickers', len(df))
+            c2.metric('BUY',  buys)
+            c3.metric('SELL', sells)
+            c4.metric('HOLD', holds)
         st.divider()
 
         if is_mobile:
@@ -339,11 +359,20 @@ with tab_fund:
     else:
         df = _load_csv(str(path), index_col=0)
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric('Companies', len(df))
-        if 'likelihood_pct' in df.columns:
-            c2.metric('Avg score', f"{df['likelihood_pct'].mean():.1f}%")
-            c3.metric('Top score', f"{df['likelihood_pct'].max():.1f}%")
+        if is_mobile:
+            items = [('Companies', len(df))]
+            if 'likelihood_pct' in df.columns:
+                items += [
+                    ('Avg score', f"{df['likelihood_pct'].mean():.1f}%"),
+                    ('Top score', f"{df['likelihood_pct'].max():.1f}%"),
+                ]
+            _kpi_row(items)
+        else:
+            c1, c2, c3 = st.columns(3)
+            c1.metric('Companies', len(df))
+            if 'likelihood_pct' in df.columns:
+                c2.metric('Avg score', f"{df['likelihood_pct'].mean():.1f}%")
+                c3.metric('Top score', f"{df['likelihood_pct'].max():.1f}%")
         st.divider()
 
         if is_mobile:
