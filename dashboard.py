@@ -245,17 +245,11 @@ with tab_signals:
         buys  = (df['signal'] == 'BUY').sum()
         sells = (df['signal'] == 'SELL').sum()
         holds = (df['signal'] == 'HOLD').sum()
-        if is_mobile:
-            st.metric('Tickers', len(df))
-            st.metric('BUY',  buys)
-            st.metric('SELL', sells)
-            st.metric('HOLD', holds)
-        else:
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric('Total tickers', len(df))
-            c2.metric('BUY',  buys)
-            c3.metric('SELL', sells)
-            c4.metric('HOLD', holds)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric('#' if is_mobile else 'Total tickers', len(df))
+        c2.metric('BUY',  buys)
+        c3.metric('SELL', sells)
+        c4.metric('HOLD', holds)
         st.divider()
 
         if is_mobile:
@@ -332,17 +326,11 @@ with tab_fund:
     else:
         df = _load_csv(str(path), index_col=0)
 
-        if is_mobile:
-            st.metric('Companies', len(df))
-            if 'likelihood_pct' in df.columns:
-                st.metric('Avg score', f"{df['likelihood_pct'].mean():.1f}%")
-                st.metric('Top score', f"{df['likelihood_pct'].max():.1f}%")
-        else:
-            c1, c2, c3 = st.columns(3)
-            c1.metric('Companies', len(df))
-            if 'likelihood_pct' in df.columns:
-                c2.metric('Avg score', f"{df['likelihood_pct'].mean():.1f}%")
-                c3.metric('Top score', f"{df['likelihood_pct'].max():.1f}%")
+        c1, c2, c3 = st.columns(3)
+        c1.metric('Cos' if is_mobile else 'Companies', len(df))
+        if 'likelihood_pct' in df.columns:
+            c2.metric('Avg' if is_mobile else 'Avg score', f"{df['likelihood_pct'].mean():.1f}%")
+            c3.metric('Top' if is_mobile else 'Top score', f"{df['likelihood_pct'].max():.1f}%")
         st.divider()
 
         if is_mobile:
